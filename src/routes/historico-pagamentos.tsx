@@ -201,9 +201,9 @@ function HistoricoPage() {
                     <col style={{ width: "10%" }} />
                     <col style={{ width: "12%" }} />
                     <col style={{ width: "11%" }} />
-                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "9%" }} />
                     <col style={{ width: "6%" }} />
-                    <col style={{ width: "5%" }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
@@ -214,8 +214,8 @@ function HistoricoPage() {
                       <th className="px-3 py-2 text-right">Valor Pago</th>
                       <th className="px-3 py-2">Diferença</th>
                       <th className="px-3 py-2 text-left">Observação</th>
-                      <th className="px-3 py-2">Comprovante</th>
-                      <th className="no-print rounded-r-lg px-3 py-2">Ajuste</th>
+                      <th className="whitespace-nowrap px-1 py-2 text-center text-[11px]">Comprovante</th>
+                      <th className="no-print whitespace-nowrap rounded-r-lg px-1 py-2 text-center text-[11px]">Ajuste</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
