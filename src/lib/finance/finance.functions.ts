@@ -431,7 +431,7 @@ export const getAnnualIndicatorTotals = createServerFn({ method: "POST" })
       throw new Error("Limite de segurança excedido na apuração; não serão exibidos totais parciais.");
     }
     const rows=await allPages(()=>supabase.from("annual_expenses")
-      .select("id,year").eq("user_id",userId).gte("year",currentYear)
+      .select("id,year,creditor,expense_source,consumption_value_type,annual_tax_kind").eq("user_id",userId).gte("year",currentYear)
       .order("year").order("id"));
     const ids=rows.map((r:any)=>r.id);
     const cells:any[]=[], payments:any[]=[];
