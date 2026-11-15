@@ -506,7 +506,7 @@ function AnuaisPage() {
 
           <section aria-label="Despesas para esse ano"
             className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
-            <h2 className="text-lg font-bold tracking-tight text-foreground">Despesas para esse ano</h2>
+            <h2 className="text-lg font-bold tracking-tight text-foreground">Despesas do exercício {year}</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.expected) : "—"}
