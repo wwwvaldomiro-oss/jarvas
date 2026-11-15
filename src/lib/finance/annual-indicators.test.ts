@@ -34,6 +34,18 @@ describe("Compromissos apurados e memorial",()=>{
     expect(result.details.map(d=>d.year)).toEqual([2027,2028]);
     expect(result.details[0]).toMatchObject({creditor:"Cartão Caixa",category:"Cartão de crédito",paid:5000,open:15000});
   });
+  it("não transfere pagamento efetuado em 2026 para o indicador de 2027",()=>{
+    const result=calculateAnnualIndicators({
+      rows:[{id:"future",year:2027,creditor:"Contrato",expense_source:"contract"}],
+      cells:[{annual_expense_id:"future",month:1,expected_cents:10000}],
+      payments:[{source_annual_id:"future",source_period:"2027-01",paid_cents:10000,
+        paid_date:"2026-12-20",is_settled:true}],
+      currentYear:2027,scope:"all",
+    });
+    expect(result.expected).toBe(10000);
+    expect(result.paid).toBe(0);
+    expect(result.open).toBe(10000);
+  });
   it("2028 ignora todos os exercícios anteriores",()=>{
     const result=calculateAnnualIndicators({rows,cells,payments,currentYear:2028,scope:"all"});
     expect(result.expected).toBe(30000);
