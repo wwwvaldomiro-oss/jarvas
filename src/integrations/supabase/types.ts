@@ -53,6 +53,7 @@ export type Database = {
           favorite: boolean
           id: string
           items: Json
+          work_details: Json
           kind: string
           recurrence: string
           reminder: boolean
@@ -67,6 +68,7 @@ export type Database = {
           favorite?: boolean
           id?: string
           items?: Json
+          work_details?: Json
           kind: string
           recurrence?: string
           reminder?: boolean
@@ -81,6 +83,7 @@ export type Database = {
           favorite?: boolean
           id?: string
           items?: Json
+          work_details?: Json
           kind?: string
           recurrence?: string
           reminder?: boolean
