@@ -2,7 +2,11 @@
  * Consolidação exclusivamente das competências da tabela Despesas Anuais.
  * Valores são inteiros em centavos; pagamentos parciais nunca equivalem à quitação.
  */
-export type IndicatorAnnualRow = {id:string;year:number};
+export type IndicatorAnnualRow = {id:string;year:number;creditor?:string;expense_source?:string|null;consumption_value_type?:string|null;annual_tax_kind?:string|null};
+export type IndicatorDetail = {
+  expenseId:string;year:number;month:number;creditor:string;category:string;
+  expected:number;paid:number;covered:number;open:number;settled:boolean;
+};
 export type IndicatorAnnualCell = {annual_expense_id:string;month:number;expected_cents:number|null};
 export type IndicatorAnnualPayment = {source_annual_id:string|null;source_period:string|null;paid_cents:number|null;paid_date:string|null;is_settled:boolean|null;expected_cents?:number|null};
 export type IndicatorTrendPoint = {period:number;expected:number;paid:number;open:number};
@@ -20,6 +24,7 @@ export function calculateAnnualIndicators(input:{
   const currentRows=input.rows.filter(r=>r.year>=input.currentYear &&
     (input.scope==="all" || r.year===input.currentYear));
   const rowYears=new Map(currentRows.map(r=>[r.id,r.year]));
+  const rowById=new Map(currentRows.map(r=>[r.id,r]));
   const years=[...new Set(currentRows.map(r=>r.year))].sort((a,b)=>a-b);
   const byPeriod=new Map<string,{paid:number;settled:boolean;explicitOpen:boolean}>();
   for(const p of input.payments){
@@ -40,6 +45,7 @@ export function calculateAnnualIndicators(input:{
   // Meses/anos sem células lançadas não se transformam em previsão ou valor fictício.
   const trendBuckets=new Map<number,{expected:number;paid:number;covered:number}>();
   const seen=new Set<string>();
+  const details:IndicatorDetail[]=[];
   for(const cell of input.cells){
     const y=rowYears.get(cell.annual_expense_id);
     if(y===undefined||!Number.isInteger(cell.month)||cell.month<1||cell.month>12) continue;
@@ -55,6 +61,14 @@ export function calculateAnnualIndicators(input:{
     paid+=amount;
     covered+=credited;
     if(cell.expected_cents!=null || amount>0){
+      const row=rowById.get(cell.annual_expense_id)!;
+      const category=row.expense_source==="card"?"Cartão de crédito"
+        :row.expense_source==="contract"?"Contrato parcelado"
+        :row.expense_source==="consumption"?(row.consumption_value_type==="variable"?"Consumo variável":"Consumo fixo")
+        :row.expense_source==="annual_tax"?"Tributo anual":"Outras despesas";
+      details.push({expenseId:cell.annual_expense_id,year:y,month:cell.month,
+        creditor:row.creditor??"Credor não identificado",category,
+        expected:value,paid:amount,covered:credited,open:Math.max(0,value-credited),settled:isCovered});
       const period=input.scope==="current"?cell.month:y;
       const bucket=trendBuckets.get(period)??{expected:0,paid:0,covered:0};
       bucket.expected+=value;
@@ -71,6 +85,7 @@ export function calculateAnnualIndicators(input:{
   return {
     expected,paid,open:Math.max(0,expected-covered),
     expenseCount:currentRows.length,yearCount:years.length,
+    details:details.sort((a,b)=>a.year-b.year||a.month-b.month||a.creditor.localeCompare(b.creditor,"pt-BR")),
     firstYear:years[0]??null,lastYear:years.at(-1)??null,
     trend,
   };
