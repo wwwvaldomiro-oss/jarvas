@@ -10,7 +10,7 @@ export function projectCardInstallments(txs:InstallmentTx[],fromYear:number,maxY
     const n=tx.creditCardMetadata?.installmentNumber??tx.installmentNumber;
     const total=tx.creditCardMetadata?.totalInstallments??tx.totalInstallments;
     if(!valid(n)||!valid(total)||total<=n||total>120||tx.type!=="DEBIT"||
-      !Number.isFinite(tx.amount)||tx.amount===0||!/^\d{4}-\d{2}-\d{2}$/.test(tx.date))continue;
+      !Number.isFinite(tx.amount)||tx.amount===0||!/^\d{4}-\d{2}-\d{2}/.test(tx.date))continue;
     const cents=Math.round(Math.abs(tx.amount)*100);
     const name=tx.description.trim().toLowerCase().replace(/\b\d{1,3}\s*\/\s*\d{1,3}\b/g,"").replace(/\s+/g," ");
     const key=`${name}:${cents}:${total}`;
