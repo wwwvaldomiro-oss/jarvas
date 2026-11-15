@@ -57,7 +57,7 @@ function HistoryDifference({ expected, paid, quits }: { expected: number; paid: 
 
 function AccountingMoney({ cents, paid = false }: { cents: number; paid?: boolean }) {
   // Keep the currency marker fixed and align digits by their decimal separator.
-  const amount = formatBRL(cents).replace(/^R\\$\\s*/, "");
+  const amount = formatBRL(cents).replace(/^R\$\s*/, "");
   return (
     <span className={`inline-grid min-w-[106px] grid-cols-[auto_1fr] items-baseline gap-2 rounded-md px-2 py-1 tabular-nums ${paid ? "bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "text-foreground"}`}>
       <span className="text-xs">R$</span>
