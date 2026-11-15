@@ -440,7 +440,12 @@
   .annual-print-table td:first-child button { display: none !important; }
   .annual-print-table .tabular-nums { font-variant-numeric: tabular-nums; }
   .annual-print-table td span.flex { display: inline-flex !important; justify-content: flex-end !important; gap: 0.6mm !important; }
-  .annual-print-table td span.text-\[10px\] { font-size: 5.8pt !important; }
   .annual-print-table tr { break-inside: avoid; page-break-inside: avoid; }
   .annual-print-table tfoot { display: table-row-group; }
+}
+
+@media print {
+  .axion-app-shell { min-height: 0 !important; }
+  .axion-app-shell > main { overflow: visible !important; }
+  .annual-print-table td span { font-size: inherit !important; }
 }
