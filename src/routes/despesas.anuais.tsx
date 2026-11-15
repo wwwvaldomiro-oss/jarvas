@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight, Archive, ArchiveRestore, ChevronDown, Plus, Printer, Trash2, Pencil, RefreshCcw } from "lucide-react";
@@ -604,7 +604,7 @@ function AnuaisPage() {
         </Dialog>
 
         <div className="annual-print-sheet mt-6 overflow-x-auto rounded-2xl border bg-card shadow-soft"
-          style={{"--annual-print-scale":String(Math.min(1,62/Math.max(rows.length+2,1)))} as React.CSSProperties}>
+          style={{"--annual-print-scale":String(Math.min(1,62/Math.max(rows.length+2,1)))} as CSSProperties}>
           <div className="annual-print-heading hidden">
             <h1>ÓRION — Despesas anuais</h1>
             <p>Exercício {year} • Situação: {archived?"Arquivado":"Em andamento"} • Valores em R$</p>
