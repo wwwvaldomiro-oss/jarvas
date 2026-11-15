@@ -227,7 +227,7 @@ export function AppShell({
           <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
             {headerActions}
             <details className="relative no-print">
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-white px-3 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:bg-accent/50" aria-label="Outros recursos do Axion"><Settings2 className="size-4" /><span className="hidden lg:inline">Outros recursos</span></summary>
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-white px-3 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:bg-accent/50" aria-label="Outros recursos do Órion"><Settings2 className="size-4" /><span className="hidden lg:inline">Outros recursos</span></summary>
               <div className="absolute right-0 z-50 mt-2 flex w-56 flex-col gap-1 rounded-2xl border bg-card p-2 shadow-soft">
                 <Link to="/notas" className="rounded-md p-2 text-sm hover:bg-accent">Anotações</Link>
                 <Link to="/nuvem" className="rounded-md p-2 text-sm hover:bg-accent">Nuvem</Link>
@@ -252,7 +252,7 @@ export function AppShell({
       </nav>
       {user && axionAccess.data?.owner && (
         <Link to="/assistente" className="axion-ai-fab no-print fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-30 md:bottom-4 flex items-center gap-2 rounded-full px-4 py-3 text-sm font-semibold text-primary-foreground focus-visible:outline-2">
-          <MessageCircle size={18} aria-hidden="true" /> Axion IA
+          <MessageCircle size={18} aria-hidden="true" /> Órion IA
         </Link>
       )}
     </div>
