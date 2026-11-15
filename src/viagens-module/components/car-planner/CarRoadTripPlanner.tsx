@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   MapPin, 
   Car, 
@@ -68,6 +68,16 @@ interface CarRoadTripPlannerProps {
   initialDestCity?: string;
 }
 
+function OrionStreetView({latitude,longitude}:{latitude:number;longitude:number}) {
+  const panoramaRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!panoramaRef.current || typeof google==='undefined' || !google.maps?.StreetViewPanorama)return;
+    const panorama=new google.maps.StreetViewPanorama(panoramaRef.current,{position:{lat:latitude,lng:longitude},visible:true,addressControl:false});
+    return ()=>panorama.setVisible(false);
+  },[latitude,longitude]);
+  return <div ref={panoramaRef} aria-label="Google Street View integrado" className="absolute inset-0 z-20 bg-[#0C1928]"/>;
+}
+
 export function CarRoadTripPlanner({
   onBackToTickets,
   initialOriginCity = 'São Paulo',
@@ -113,6 +123,12 @@ export function CarRoadTripPlanner({
   const [customFuelPrice, setCustomFuelPrice] = useState<number>(6.09);
   const [customKmPerL, setCustomKmPerL] = useState<number>(12.0);
   const [selectedTollTag, setSelectedTollTag] = useState<string>('sem_parar');
+  const [routePreference, setRoutePreference] = useState<'fastest'|'shortest'|'avoid_tolls'>('fastest');
+  const [calculateReturn, setCalculateReturn] = useState(false);
+  const [googleMapType, setGoogleMapType] = useState<'roadmap'|'satellite'>('roadmap');
+  const [streetViewEnabled, setStreetViewEnabled] = useState(false);
+  const [googleRouteMetrics, setGoogleRouteMetrics] = useState<{distanceKm:number;durationMinutes:number;returnDistanceKm:number;alternativeCount:number}|null>(null);
+  const handleGoogleRouteMetrics = useCallback((metrics:{distanceKm:number;durationMinutes:number;returnDistanceKm:number;alternativeCount:number}|null)=>setGoogleRouteMetrics(metrics),[]);
 
   // Accordion Expand/Collapse State
   const [openAccordions, setOpenAccordions] = useState<{
@@ -210,6 +226,7 @@ export function CarRoadTripPlanner({
     customKmPerL
   ]);
 
+  useEffect(()=>{setGoogleRouteMetrics(null);},[originWaypoint,destWaypoint,relabeledIntermediateStops,routePreference,calculateReturn]);
   // Center map on route when polyline updates
   useEffect(() => {
     if (calculatedRoute.polyline.length > 0) {
@@ -394,6 +411,14 @@ export function CarRoadTripPlanner({
           <div className="flex items-center gap-2">
             <button type="button" onClick={saveCurrentRoute} className="flex items-center gap-1.5 rounded-lg bg-[#B99555] px-3 py-2 text-xs font-bold text-[#0C1928]"><Save className="size-4"/> Salvar rota</button>
             <button type="button" onClick={() => setSavedRoutesOpen(true)} className="flex items-center gap-1.5 rounded-lg border border-[#B99555]/40 px-3 py-2 text-xs font-bold text-white"><FolderOpen className="size-4"/> Rotas salvas ({savedRoutes.length})</button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-white">
+            <label className="flex items-center gap-1.5">Rota
+              <select aria-label="Preferência de rota" className="rounded-lg bg-[#173D4A] p-2 text-white" value={routePreference} onChange={e=>setRoutePreference(e.target.value as typeof routePreference)}>
+                <option value="fastest">Mais rápida</option><option value="shortest">Mais curta</option><option value="avoid_tolls">Evitar pedágios</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-[#B99555]/40 px-3 py-2"><input type="checkbox" checked={calculateReturn} onChange={e=>setCalculateReturn(e.target.checked)}/> Calcular volta</label>
           </div>
           {/* Right Actions: Enviar p/ GPS + Compartilhar Rota */}
           <div className="flex items-center gap-2">
@@ -1060,6 +1085,11 @@ export function CarRoadTripPlanner({
         {/* ======================================================== */}
         <main className="lg:col-span-8 xl:col-span-9 bg-slate-900 relative flex flex-col min-h-[500px] lg:min-h-[700px] overflow-hidden">
           
+          {googleMapsApiKey && <div className="absolute bottom-5 left-4 z-30 flex flex-wrap gap-2">
+            <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#173D4A] shadow" onClick={()=>setGoogleMapType(t=>t==='roadmap'?'satellite':'roadmap')}>{googleMapType==='roadmap'?'Satélite':'Mapa'}</button>
+            <button type="button" className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-[#173D4A] shadow" onClick={()=>setStreetViewEnabled(v=>!v)}>{streetViewEnabled?'Fechar Street View':'Street View'}</button>
+          </div>}
+          {googleRouteMetrics && <div className="absolute bottom-5 right-4 z-30 rounded-xl bg-white/95 px-3 py-2 text-xs font-semibold text-[#173D4A] shadow-lg">Google: {googleRouteMetrics.distanceKm.toFixed(1)} km · {Math.round(googleRouteMetrics.durationMinutes)} min {calculateReturn?'(ida e volta)':''} · {googleRouteMetrics.alternativeCount} alternativa(s)</div>}
           {/* Floating Map Controls & Layer Toggles */}
           <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
             {/* Layer Toggles */}
@@ -1103,6 +1133,7 @@ export function CarRoadTripPlanner({
               <Map
                   internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
                   mapId="DEMO_MAP_ID"
+                  mapTypeId={googleMapType}
                   style={{ width: '100%', height: '100%' }}
                   defaultCenter={mapCenter}
                   defaultZoom={7}
@@ -1115,7 +1146,11 @@ export function CarRoadTripPlanner({
                     destination={destWaypoint}
                     waypoints={relabeledIntermediateStops}
                     defaultPolyline={calculatedRoute.polyline}
+                    preference={routePreference}
+                    roundTrip={calculateReturn}
+                    onRouteMetrics={handleGoogleRouteMetrics}
                   />
+                  {streetViewEnabled && <OrionStreetView latitude={originWaypoint.lat} longitude={originWaypoint.lng} />}
 
                   {/* Origin Marker */}
                   <AdvancedMarker
