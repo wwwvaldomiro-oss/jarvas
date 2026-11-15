@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794700799188,
+      "tag": "0000_conecta_base_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794700873781,
+      "tag": "0001_conecta_agenda_revenue_recipients",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794700962371,
+      "tag": "0002_conecta_axion_and_card_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794701004111,
+      "tag": "0003_conecta_card_profiles_invoices",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794701044562,
+      "tag": "0004_conecta_fiscal_snapshots_classification_loyalty",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794701089211,
+      "tag": "0005_conecta_payment_settlement",
+      "breakpoints": true
+    }
+  ]
+}

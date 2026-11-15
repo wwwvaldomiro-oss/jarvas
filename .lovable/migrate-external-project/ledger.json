@@ -1,0 +1,93 @@
+[
+ {
+  "capability": "code",
+  "source": "code archive (TanStack Start app)",
+  "outcome": "migrate",
+  "status": "done",
+  "next_action": "signed-in flow check pending"
+ },
+ {
+  "capability": "schema",
+  "source": "drizzle + supabase migrations; base tables reconstructed from generated types",
+  "outcome": "migrate",
+  "status": "done",
+  "next_action": "signed-in flow check pending"
+ },
+ {
+  "capability": "records",
+  "source": "previous Cloud database (no export attached)",
+  "outcome": "migrate",
+  "status": "pending",
+  "next_action": "user supplies CSV/JSON exports"
+ },
+ {
+  "capability": "auth identities",
+  "source": "previous Cloud auth (email/password + Google)",
+  "outcome": "migrate",
+  "status": "pending",
+  "next_action": "user export of users (id, email)"
+ },
+ {
+  "capability": "authorization",
+  "source": "RLS per user_id",
+  "outcome": "migrate",
+  "status": "done",
+  "next_action": "signed-in flow check pending"
+ },
+ {
+  "capability": "uploaded file bytes",
+  "source": "storage buckets comprovantes, fiscal-private, cloud-docs",
+  "outcome": "migrate",
+  "status": "pending",
+  "next_action": "buckets created; files need re-upload/export"
+ },
+ {
+  "capability": "AI (Axion: OpenAI/Gemini keys stored per owner)",
+  "source": "AXION_OPENAI_API_KEY env + vault",
+  "outcome": "preserve",
+  "status": "pending",
+  "next_action": "owner row in axion_owner must be set after first sign-in; keys saved via app settings"
+ },
+ {
+  "capability": "Pluggy Open Finance",
+  "source": "PLUGGY_CLIENT_ID/SECRET",
+  "outcome": "preserve",
+  "status": "pending",
+  "next_action": "secret requested at verification"
+ },
+ {
+  "capability": "Google Maps",
+  "source": "VITE_GOOGLE_MAPS_API_KEY",
+  "outcome": "preserve",
+  "status": "pending",
+  "next_action": "key requested at verification"
+ },
+ {
+  "capability": "BrasilAPI / market quotes",
+  "source": "public APIs",
+  "outcome": "preserve",
+  "status": "in_progress",
+  "next_action": "verify after build"
+ },
+ {
+  "capability": "schedules/webhooks",
+  "source": "cron-auth helper present, no schedules found in code",
+  "outcome": "preserve",
+  "status": "verified",
+  "next_action": "none"
+ },
+ {
+  "capability": "cutover",
+  "source": "old project URL",
+  "outcome": "migrate",
+  "status": "pending",
+  "next_action": "publish when data imported"
+ },
+ {
+  "capability": "verification",
+  "source": "-",
+  "outcome": "migrate",
+  "status": "partial",
+  "next_action": "typecheck clean, 194 tests pass, sign-in page renders; signed-in flows untested (no account yet)"
+ }
+]
