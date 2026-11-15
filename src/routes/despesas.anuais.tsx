@@ -121,7 +121,7 @@ function AnuaisPage() {
   const linkedFutureCards = futureCardQuery.data?.linkedCards ?? [];
   const virtualCardRows = linkedFutureCards
     .filter(card => !savedRows.some((r:any) =>
-      r.id===card.annualExpenseId || (r.expense_source==="card" && r.source_template_id===card.annualExpenseId)))
+      r.id===card.annualExpenseId || (r.expense_source==="card" && r.source_template_id===card.templateId)))
     .map(card => ({
       id:`forecast:${card.accountId}:${year}`,
       creditor:card.creditor, creditor_original:card.creditor,
@@ -129,7 +129,8 @@ function AnuaisPage() {
       forecast_only:true, card_account_id:card.accountId
     }));
   const rows = [...savedRows.map((r:any)=>({...r,card_account_id:profiles.find(p=>
-    p.annual_expense_id===r.id || (r.source_template_id && p.annual_expense_id===r.source_template_id))?.account_id??null})),...virtualCardRows];
+    p.annual_expense_id===r.id || (r.source_template_id && p.annual_expense_id===r.source_template_id))?.account_id
+    ??linkedFutureCards.find(card=>card.annualExpenseId===r.id||card.templateId===r.source_template_id)?.accountId??null})),...virtualCardRows];
   const archived = !!q.data?.year?.archived_at;
   // Ano já terminado ou encerrado manualmente: Total anual representa apenas baixas quitadas.
   const closedYear = archived || year < currentYear;
@@ -143,7 +144,7 @@ function AnuaisPage() {
   for (const f of cardForecasts) {
     const matching = profiles.find(p=>p.account_id===f.accountId);
     const physical=savedRows.find((r:any)=>r.expense_source==="card" &&
-      (r.id===matching?.annual_expense_id || r.source_template_id===matching?.annual_expense_id));
+      (r.id===matching?.annual_expense_id || r.source_template_id===linkedFutureCards.find(card=>card.accountId===f.accountId)?.templateId));
     const id=physical?.id??`forecast:${f.accountId}:${year}`;
     if (!monthsByRow.has(id)) monthsByRow.set(id,new Map());
     const cells = monthsByRow.get(id)!;
@@ -654,7 +655,7 @@ function AnuaisPage() {
               <div className="space-y-2">
                 <Label htmlFor="ec-kind">Tipo de despesa</Label>
                 <select id="ec-kind" className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                  value={editCreditor.expenseSource} onChange={e=>setEditCreditor({...editCreditor,
+                  value={editCreditor.expenseSource} disabled={editCreditor.projectionCard} onChange={e=>setEditCreditor({...editCreditor,
                     expenseSource:e.target.value as SourceKind})}>
                   <option value="manual">Despesa avulsa / outra obrigação</option>
                   <option value="contract">Contrato parcelado</option>
@@ -675,11 +676,13 @@ function AnuaisPage() {
               {editCreditor.expenseSource==="card" && <div className="space-y-2">
                 <Label htmlFor="ec-card">Cartão vinculado à Carteiras</Label>
                 <select id="ec-card" className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                  value={editCreditor.cardAccountId} onChange={e=>setEditCreditor({...editCreditor,cardAccountId:e.target.value})}>
+                  value={editCreditor.cardAccountId} disabled={editCreditor.projectionCard} onChange={e=>setEditCreditor({...editCreditor,cardAccountId:e.target.value})}>
                   <option value="">Selecionar cartão conectado</option>
                   {cardChoices.map(card=><option key={card.id} value={card.id}>{card.name}</option>)}
                 </select>
-                <p className="text-xs text-muted-foreground">Somente faturas fechadas confirmadas pelo Open Finance serão atualizadas no exercício correspondente.</p>
+                <p className="text-xs text-muted-foreground">{editCreditor.projectionCard
+                    ? "Vínculo Open Finance preservado no cartão original. Neste exercício, edite o nome, vencimento e os valores diretamente nas células."
+                    : "Somente faturas fechadas confirmadas pelo Open Finance serão atualizadas no exercício correspondente."}</p>
                 {!cardProfilesAvailable && <p role="alert" className="text-xs text-amber-700">
                   O vínculo não pode ser alterado antes da migração da tabela finance_account_profiles.
                 </p>}
