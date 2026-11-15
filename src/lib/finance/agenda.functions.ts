@@ -4,7 +4,9 @@ import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import type { PersonalRecord } from './agenda-personal';
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v => Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v);
-const recordSchema = z.object({ id: z.string().uuid().optional(), kind: z.enum(['birthday','work','appointment','event','tasks','shopping']), title: z.string().trim().min(1).max(200), start_date: date, time: z.string().regex(/^(|([01]\d|2[0-3]):[0-5]\d)$/), description: z.string().max(2000), recurrence: z.enum(['none','daily','weekly','monthly','yearly','12x36']), favorite: z.boolean(), reminder: z.boolean(), items: z.array(z.object({ key: z.string().uuid(), description: z.string().trim().min(1).max(300), quantity: z.number().positive().max(100000), cents: z.number().int().min(0).max(999999999999) })).max(100) });
+const timeField = z.string().regex(/^(|([01]\d|2[0-3]):[0-5]\d)$/);
+const workDetailsSchema = z.object({end_time: timeField.optional(), break_start: timeField.optional(), break_end: timeField.optional(), schedule_name: z.string().trim().max(100).optional(), selected_dates: z.array(date).max(3660).optional()}).optional();
+const recordSchema = z.object({ id: z.string().uuid().optional(), kind: z.enum(['birthday','work','appointment','event','tasks','shopping']), title: z.string().trim().min(1).max(200), start_date: date, time: z.string().regex(/^(|([01]\d|2[0-3]):[0-5]\d)$/), description: z.string().max(2000), recurrence: z.enum(['none','daily','weekly','monthly','yearly','12x36','custom']), favorite: z.boolean(), reminder: z.boolean(), work_details: workDetailsSchema, items: z.array(z.object({ key: z.string().uuid(), description: z.string().trim().min(1).max(300), quantity: z.number().positive().max(100000), cents: z.number().int().min(0).max(999999999999) })).max(100) });
 export const getPersonalAgenda = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async ({context}) => {
   const [records, checks] = await Promise.all([context.supabase.from('agenda_records').select('*').order('created_at'), context.supabase.from('agenda_checks').select('*')]);
   if (records.error || checks.error) throw new Error('Não foi possível carregar a agenda pessoal.');
@@ -13,7 +15,15 @@ export const getPersonalAgenda = createServerFn({method:'POST'}).middleware([req
 export const savePersonalAgenda = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown) => recordSchema.parse(v)).handler(async ({data,context}) => {
   const {id,...fields} = data;
   if (fields.kind === 'birthday') fields.recurrence = 'yearly';
-  if (fields.kind === 'work') fields.recurrence = '12x36';
+  if (fields.kind === 'work') {
+    if (!['12x36','custom'].includes(fields.recurrence)) throw new Error('Escala de trabalho inválida.');
+    if (!fields.time || !fields.work_details?.end_time) throw new Error('Informe entrada e saída do trabalho.');
+    const {break_start,break_end,selected_dates} = fields.work_details;
+    if (Boolean(break_start) !== Boolean(break_end)) throw new Error('Informe início e fim do intervalo.');
+    if (fields.recurrence === 'custom' && !(selected_dates?.length)) throw new Error('Selecione os dias de trabalho.');
+    if (fields.recurrence === 'custom' && selected_dates?.some(d => d < fields.start_date)) throw new Error('Há datas anteriores ao primeiro dia.');
+  }
+
   const result = id ? await context.supabase.from('agenda_records').update(fields).eq('id',id).select('id').single() : await context.supabase.from('agenda_records').insert({...fields,user_id:context.userId}).select('id').single();
   if (result.error || !result.data) throw new Error('Não foi possível salvar o registro.');
   return result.data;
