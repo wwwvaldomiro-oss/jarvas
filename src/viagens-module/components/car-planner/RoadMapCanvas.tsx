@@ -265,12 +265,8 @@ export function RoadMapCanvas({
       <button type="button" onClick={()=>setView(routeFit)} title="Enquadrar a rota" className="rounded-lg bg-white p-2 text-xs font-semibold text-slate-800 shadow">Rota</button>
     </div>
     <div className="absolute top-16 right-3 left-3 z-20 flex flex-wrap gap-1.5">
-      <a href={mapsDirectionsUrl(actualStops)} target="_blank" rel="noopener noreferrer"
-        className="rounded-lg bg-white/95 px-2 py-1.5 text-[11px] font-bold text-sky-900 shadow">Google Maps ↗</a>
-      <a href={streetViewUrl(current.lat,current.lng)} target="_blank" rel="noopener noreferrer"
-        className="rounded-lg bg-white/95 px-2 py-1.5 text-[11px] font-bold text-sky-900 shadow" title="Street View próximo ao centro atual do mapa">Street View ↗</a>
-      <a href={satelliteUrl(current.lat,current.lng)} target="_blank" rel="noopener noreferrer"
-        className="rounded-lg bg-white/95 px-2 py-1.5 text-[11px] font-bold text-sky-900 shadow">Satélite ↗</a>
+      <span className="rounded-lg bg-white/95 px-2 py-1.5 text-[11px] font-bold text-[#173D4A] shadow">Mapa interativo · OpenStreetMap</span>
+      <span className="rounded-lg bg-white/95 px-2 py-1.5 text-[11px] text-slate-600 shadow" title="Para usar Google Satélite e Street View dentro do Órion, configure a chave da Google Maps JavaScript API.">Satélite e Street View requerem Google Maps API</span>
     </div>
     <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer"
       className="absolute bottom-1 right-2 z-20 rounded bg-white/90 px-2 text-[10px] text-slate-800">© OpenStreetMap contributors</a>
