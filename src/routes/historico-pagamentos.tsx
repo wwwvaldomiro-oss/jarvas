@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Pencil, Printer } from "lucide-react";
+import { Copy, Filter, Pencil, Printer, Settings2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, useRequireUser } from "@/components/AppShell";
 import { PayDialog, type PayTarget } from "@/components/finance/PayDialog";
@@ -15,9 +15,9 @@ export const Route = createFileRoute("/historico-pagamentos")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Histórico de Pagamentos — Axion" },
+      { title: "Histórico de Pagamentos — Órion" },
       { name: "description", content: "Todos os pagamentos confirmados, agrupados pelo mês de vencimento." },
-      { property: "og:title", content: "Histórico de Pagamentos — Axion" },
+      { property: "og:title", content: "Histórico de Pagamentos — Órion" },
       { property: "og:description", content: "Todos os pagamentos confirmados, agrupados pelo mês de vencimento." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -55,11 +55,24 @@ function HistoryDifference({ expected, paid, quits }: { expected: number; paid: 
   </span>;
 }
 
+function AccountingMoney({ cents, paid = false }: { cents: number; paid?: boolean }) {
+  // Keep the currency marker fixed and align digits by their decimal separator.
+  const amount = formatBRL(cents).replace(/^R\\$\\s*/, "");
+  return (
+    <span className={`inline-grid min-w-[106px] grid-cols-[auto_1fr] items-baseline gap-2 rounded-md px-2 py-1 tabular-nums ${paid ? "bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "text-foreground"}`}>
+      <span className="text-xs">R$</span>
+      <span className="text-right">{amount}</span>
+    </span>
+  );
+}
+
 function HistoricoPage() {
   const user = useRequireUser();
   const qc = useQueryClient();
   const [year, setYear] = useState<number | null>(null);
   const [creditor, setCreditor] = useState<string | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
+  const [activeMenu, setActiveMenu] = useState<"filter" | "settings" | null>(null);
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
 
   const historyFn = useServerFn(getHistory);
@@ -70,8 +83,9 @@ function HistoricoPage() {
   });
 
   const items = (q.data?.items ?? []) as HistoryItem[];
+  const filteredItems = month === null ? items : items.filter((it) => Number(it.dueDate.slice(5, 7)) === month);
   const groups = new Map<string, HistoryItem[]>();
-  for (const it of items) {
+  for (const it of filteredItems) {
     const key = monthOfDueDate(it.dueDate);
     groups.set(key, [...(groups.get(key) ?? []), it]);
   }
@@ -83,7 +97,7 @@ function HistoricoPage() {
   }
 
   async function copyReport() {
-    const lines: string[] = ["Histórico de Pagamentos — Axion", ""];
+    const lines: string[] = ["Histórico de Pagamentos — Órion", ""];
     for (const [key, list] of groups) {
       lines.push(groupLabel(key));
       lines.push(["Credor", "Valor Previsto", "Vencimento", "Pagamento", "Valor Pago", "Diferença", "Observação"].join("\t"));
@@ -115,30 +129,58 @@ function HistoricoPage() {
             <h1 className="text-3xl font-extrabold">Histórico de Pagamentos</h1>
             <p className="text-sm text-muted-foreground">Pagamentos confirmados, agrupados pelo mês de vencimento.</p>
           </div>
-          <div className="no-print flex flex-wrap items-center gap-2">
-            <select
-              className="h-10 rounded-md border bg-card px-3 text-sm"
-              value={year ?? ""}
-              onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">Todos os anos</option>
-              {(q.data?.years ?? []).map((yy) => <option key={yy} value={yy}>{yy}</option>)}
-            </select>
-            <select
-              className="h-10 rounded-md border bg-card px-3 text-sm"
-              value={creditor ?? ""}
-              onChange={(e) => setCreditor(e.target.value || null)}
-            >
-              <option value="">Todos os credores</option>
-              {(q.data?.creditors ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <Button variant="outline" onClick={copyReport}><Copy />Copiar</Button>
-            <Button variant="outline" onClick={() => window.print()}><Printer />Imprimir / PDF</Button>
+          <div className="no-print flex flex-wrap items-start gap-2">
+            <div className="relative">
+              <Button variant="outline" aria-expanded={activeMenu === "filter"} aria-label="Abrir filtros" onClick={() => setActiveMenu(activeMenu === "filter" ? null : "filter")}>
+                <Filter className="size-4" /> Filtro {(year !== null || month !== null || creditor !== null) && "•"}
+              </Button>
+              {activeMenu === "filter" && (
+                <div className="absolute right-0 z-30 mt-2 w-72 space-y-3 rounded-xl border bg-card p-4 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <strong className="text-sm">Filtrar pagamentos</strong>
+                    <button aria-label="Fechar filtros" onClick={() => setActiveMenu(null)}><X className="size-4" /></button>
+                  </div>
+                  <label className="block text-xs font-semibold text-muted-foreground">Ano
+                    <select aria-label="Filtrar por ano" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground" value={year ?? ""} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : null)}>
+                      <option value="">Todos os anos</option>
+                      {(q.data?.years ?? []).map((yy) => <option key={yy} value={yy}>{yy}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-semibold text-muted-foreground">Mês
+                    <select aria-label="Filtrar por mês" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground" value={month ?? ""} onChange={(e) => setMonth(e.target.value ? Number(e.target.value) : null)}>
+                      <option value="">Todos os meses</option>
+                      {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{new Date(2026, i).toLocaleDateString("pt-BR", { month: "long" })}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-xs font-semibold text-muted-foreground">Credor
+                    <select aria-label="Filtrar por credor" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground" value={creditor ?? ""} onChange={(e) => setCreditor(e.target.value || null)}>
+                      <option value="">Todos os credores</option>
+                      {(q.data?.creditors ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </label>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => { setYear(null); setMonth(null); setCreditor(null); }}>Limpar</Button>
+                    <Button size="sm" onClick={() => setActiveMenu(null)}>Aplicar</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <Button variant="outline" aria-expanded={activeMenu === "settings"} aria-label="Opções do histórico" onClick={() => setActiveMenu(activeMenu === "settings" ? null : "settings")}>
+                <Settings2 className="size-4" /> Opções
+              </Button>
+              {activeMenu === "settings" && (
+                <div className="absolute right-0 z-30 mt-2 min-w-48 space-y-1 rounded-xl border bg-card p-2 shadow-lg">
+                  <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent" onClick={() => { setActiveMenu(null); void copyReport(); }}><Copy className="size-4" /> Copiar</button>
+                  <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent" onClick={() => { setActiveMenu(null); window.print(); }}><Printer className="size-4" /> Imprimir / PDF</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {q.isLoading && <p className="mt-10 text-center text-muted-foreground">Carregando histórico…</p>}
-        {!q.isLoading && items.length === 0 && (
+        {!q.isLoading && filteredItems.length === 0 && (
           <p className="mt-10 text-center text-muted-foreground">Nenhum pagamento confirmado encontrado.</p>
         )}
 
@@ -151,7 +193,18 @@ function HistoricoPage() {
                 <span className="text-sm font-semibold text-success">{list.length} pagamentos · {formatBRL(totalPaid)}</span>
               </div>
               <div className="overflow-x-auto p-5 pt-3">
-                <table className="w-full min-w-[1050px] text-sm">
+                <table className="w-full min-w-[1280px] table-fixed text-sm">
+                  <colgroup>
+                    <col style={{ width: "19%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "10%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "6%" }} />
+                    <col style={{ width: "4%" }} />
+                  </colgroup>
                   <thead>
                     <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                       <th className="rounded-l-lg px-3 py-2 text-left">Credor</th>
@@ -174,12 +227,12 @@ function HistoricoPage() {
                             <div className="text-xs text-muted-foreground">Parcela {it.installmentNumber}</div>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right">{formatBRL(it.expectedCents)}</td>
+                        <td className="px-2 py-2 text-right"><AccountingMoney cents={it.expectedCents} /></td>
                         <td className="px-3 py-2 text-center">{formatDateBR(it.dueDate)}</td>
                         <td className="px-3 py-2 text-center">{formatDateBR(it.paidDate)}</td>
-                        <td className="px-3 py-2 text-right font-semibold">{formatBRL(it.paidCents)}</td>
+                        <td className="px-2 py-2 text-right"><AccountingMoney cents={it.paidCents} paid /></td>
                         <td className="px-3 py-2 text-center text-xs"><HistoryDifference expected={it.expectedCents} paid={it.paidCents} quits={it.is_settled} /></td>
-                        <td className="max-w-52 px-3 py-2 text-xs">
+                        <td className="break-words px-3 py-2 text-xs">
                           {displayNote({ due_date: it.dueDate, paid_date: it.paidDate, expected_cents: it.expectedCents, paid_cents: it.paidCents, note: it.note, is_settled: it.is_settled })}
                         </td>
                         <td className="px-3 py-2">
