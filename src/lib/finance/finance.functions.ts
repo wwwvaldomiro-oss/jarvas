@@ -630,6 +630,13 @@ export const updateAnnualCell = createServerFn({ method: "POST" })
     const { data: row } = await supabase.from("annual_expenses").select("year, creditor").eq("id", data.expenseId).single();
     if (!row) throw new Error("Credor não encontrado");
     await assertYearOpen(supabase, row.year);
+    // Nunca permitir que o ajuste manual de uma previsão altere competência já paga.
+    const period=`${row.year}-${String(data.month).padStart(2,"0")}`;
+    const {data:paid,error:paidError}=await supabase.from("finance_bills")
+      .select("id").eq("source_annual_id",data.expenseId).eq("source_period",period)
+      .not("paid_date","is",null).limit(1);
+    if(paidError)throw new Error("Não foi possível verificar pagamentos existentes: "+paidError.message);
+    if(paid?.length)throw new Error("Competência já paga: corrija o pagamento pelo Histórico de Pagamentos.");
     const { data: before } = await supabase.from("annual_expense_months").select("expected_cents").eq("annual_expense_id", data.expenseId).eq("month", data.month).maybeSingle();
     const { error } = await supabase.from("annual_expense_months").upsert(
       { annual_expense_id: data.expenseId, month: data.month, expected_cents: data.expectedCents },
