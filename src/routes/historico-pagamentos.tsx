@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, Filter, Pencil, Printer, Settings2, X } from "lucide-react";
+import { Copy, Filter, Pencil, Printer, Settings, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, useRequireUser } from "@/components/AppShell";
 import { PayDialog, type PayTarget } from "@/components/finance/PayDialog";
@@ -167,7 +167,7 @@ function HistoricoPage() {
             </div>
             <div className="relative">
               <Button variant="outline" aria-expanded={activeMenu === "settings"} aria-label="Opções do histórico" onClick={() => setActiveMenu(activeMenu === "settings" ? null : "settings")}>
-                <Settings2 className="size-4" /> Opções
+                <Settings className="size-4" /> Opções
               </Button>
               {activeMenu === "settings" && (
                 <div className="absolute right-0 z-30 mt-2 min-w-48 space-y-1 rounded-xl border bg-card p-2 shadow-lg">
@@ -195,7 +195,7 @@ function HistoricoPage() {
               <div className="overflow-x-auto p-5 pt-3">
                 <table className="w-full min-w-[1280px] table-fixed text-sm">
                   <colgroup>
-                    <col style={{ width: "19%" }} />
+                    <col style={{ width: "18%" }} />
                     <col style={{ width: "12%" }} />
                     <col style={{ width: "10%" }} />
                     <col style={{ width: "10%" }} />
@@ -203,7 +203,7 @@ function HistoricoPage() {
                     <col style={{ width: "11%" }} />
                     <col style={{ width: "16%" }} />
                     <col style={{ width: "6%" }} />
-                    <col style={{ width: "4%" }} />
+                    <col style={{ width: "5%" }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
