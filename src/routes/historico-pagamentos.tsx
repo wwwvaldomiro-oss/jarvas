@@ -127,7 +127,7 @@ function HistoricoPage() {
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Controle financeiro</div>
             <h1 className="text-3xl font-extrabold">Histórico de Pagamentos</h1>
-            <p className="text-sm text-muted-foreground">Pagamentos confirmados, agrupados pelo mês de vencimento.</p>
+            <p className="text-sm text-muted-foreground">Pagamentos confirmados</p>
           </div>
           <div className="no-print flex flex-wrap items-start gap-2">
             <div className="relative">
@@ -190,7 +190,7 @@ function HistoricoPage() {
             <section key={key} className="mt-6 rounded-2xl border bg-card shadow-soft">
               <div className="flex items-center justify-between px-5 pt-4">
                 <h2 className="text-lg font-bold">{groupLabel(key)}</h2>
-                <span className="text-sm font-semibold text-success">{list.length} pagamentos · {formatBRL(totalPaid)}</span>
+                <span className="text-base font-bold text-success tabular-nums">{list.length} pagamentos · {formatBRL(totalPaid)}</span>
               </div>
               <div className="overflow-x-auto p-5 pt-3">
                 <table className="w-full min-w-[1280px] table-fixed text-sm">
@@ -201,9 +201,9 @@ function HistoricoPage() {
                     <col style={{ width: "10%" }} />
                     <col style={{ width: "12%" }} />
                     <col style={{ width: "11%" }} />
-                    <col style={{ width: "16%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "9%" }} />
                     <col style={{ width: "6%" }} />
-                    <col style={{ width: "5%" }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
@@ -214,8 +214,8 @@ function HistoricoPage() {
                       <th className="px-3 py-2 text-right">Valor Pago</th>
                       <th className="px-3 py-2">Diferença</th>
                       <th className="px-3 py-2 text-left">Observação</th>
-                      <th className="px-3 py-2">Comprovante</th>
-                      <th className="no-print rounded-r-lg px-3 py-2">Ajuste</th>
+                      <th className="whitespace-nowrap px-1 py-2 text-center text-[11px]">Comprovante</th>
+                      <th className="no-print whitespace-nowrap rounded-r-lg px-1 py-2 text-center text-[11px]">Ajuste</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
