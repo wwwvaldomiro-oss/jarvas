@@ -8,6 +8,9 @@ interface GoogleMapRouteDirectorProps {
   waypoints?: RouteWaypoint[];
   defaultPolyline: [number, number][]; // [lat, lng][] from toll engine
   onPathUpdated?: (coords: Array<{ lat: number; lng: number }>) => void;
+  preference?: 'fastest' | 'shortest' | 'avoid_tolls';
+  roundTrip?: boolean;
+  onRouteMetrics?: (data: { distanceKm:number; durationMinutes:number; returnDistanceKm:number; alternativeCount:number } | null) => void;
 }
 
 /**
@@ -64,7 +67,10 @@ export function GoogleMapRouteDirector({
   destination,
   waypoints = [],
   defaultPolyline,
-  onPathUpdated
+  onPathUpdated,
+  preference = 'fastest',
+  roundTrip = false,
+  onRouteMetrics
 }: GoogleMapRouteDirectorProps) {
   const map = useMap();
   const routesLib = useMapsLibrary('routes');
@@ -72,6 +78,8 @@ export function GoogleMapRouteDirector({
 
   const casingPolylineRef = useRef<google.maps.Polyline | null>(null);
   const corePolylineRef = useRef<google.maps.Polyline | null>(null);
+  const returnPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const [returnPath, setReturnPath] = useState<Array<{lat:number;lng:number}>>([]);
 
   // Validate origin, destination, and intermediate waypoints
   const isOriginValid = isValidCoordinate(origin?.lat, origin?.lng);
@@ -111,6 +119,7 @@ export function GoogleMapRouteDirector({
   // Reset directionsPath when waypoints change to guarantee instant responsiveness
   useEffect(() => {
     setDirectionsPath(null);
+    setReturnPath([]);
   }, [origin.lat, origin.lng, destination.lat, destination.lng, waypoints]);
 
   // 1. Asynchronously request turn-by-turn driving route from Google DirectionsService
@@ -129,25 +138,33 @@ export function GoogleMapRouteDirector({
         stopover: true
       }));
 
-      directionsService.route(
-        {
-          origin: originLoc,
-          destination: destLoc,
-          waypoints: intermediateWaypoints,
-          travelMode: google.maps.TravelMode.DRIVING
-        },
-        (result, status) => {
-          if (!isMounted) return;
-          if (status === google.maps.DirectionsStatus.OK && result) {
-            const overview = result.routes[0]?.overview_path;
-            if (overview && overview.length > 0) {
-              const highResPoints = overview.map(pt => ({ lat: pt.lat(), lng: pt.lng() }));
-              setDirectionsPath(highResPoints);
-              if (onPathUpdated) onPathUpdated(highResPoints);
-            }
-          }
-        }
-      );
+      const request: google.maps.DirectionsRequest = {
+        origin:originLoc,destination:destLoc,waypoints:intermediateWaypoints,
+        travelMode:google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives:intermediateWaypoints.length === 0,
+        avoidTolls:preference === 'avoid_tolls'
+      };
+      const distanceOf = (r:google.maps.DirectionsRoute) => r.legs.reduce((v,l)=>v+(l.distance?.value||0),0);
+      const durationOf = (r:google.maps.DirectionsRoute) => r.legs.reduce((v,l)=>v+(l.duration?.value||0),0);
+      const choose = (routes:google.maps.DirectionsRoute[]) => [...routes].sort((a,b)=>preference==='shortest'?distanceOf(a)-distanceOf(b):durationOf(a)-durationOf(b))[0];
+      directionsService.route(request,(result,status)=>{
+        if(!isMounted)return;
+        if(status!==google.maps.DirectionsStatus.OK||!result?.routes.length){onRouteMetrics?.(null);return;}
+        const selected=choose(result.routes);
+        const path=selected.overview_path.map(pt=>({lat:pt.lat(),lng:pt.lng()}));
+        if(path.length<2){onRouteMetrics?.(null);return;}
+        setDirectionsPath(path);onPathUpdated?.(path);
+        const outboundDistance=distanceOf(selected)/1000;
+        const outboundMinutes=durationOf(selected)/60;
+        if(!roundTrip){setReturnPath([]);onRouteMetrics?.({distanceKm:outboundDistance,durationMinutes:outboundMinutes,returnDistanceKm:0,alternativeCount:result.routes.length});return;}
+        directionsService.route({origin:destLoc,destination:originLoc,waypoints:[...intermediateWaypoints].reverse(),travelMode:google.maps.TravelMode.DRIVING,provideRouteAlternatives:intermediateWaypoints.length===0,avoidTolls:preference==='avoid_tolls'},(backResult,backStatus)=>{
+          if(!isMounted)return;
+          if(backStatus!==google.maps.DirectionsStatus.OK||!backResult?.routes.length){setReturnPath([]);onRouteMetrics?.(null);return;}
+          const back=choose(backResult.routes);
+          setReturnPath(back.overview_path.map(pt=>({lat:pt.lat(),lng:pt.lng()})));
+          onRouteMetrics?.({distanceKm:outboundDistance+distanceOf(back)/1000,durationMinutes:outboundMinutes+durationOf(back)/60,returnDistanceKm:distanceOf(back)/1000,alternativeCount:result.routes.length});
+        });
+      });
     } catch {
       // In case of restriction or offline state, validatedBasePath remains active
     }
@@ -155,7 +172,7 @@ export function GoogleMapRouteDirector({
     return () => {
       isMounted = false;
     };
-  }, [map, routesLib, isOriginValid, isDestValid, origin.lat, origin.lng, destination.lat, destination.lng, validWaypoints]);
+  }, [map, routesLib, isOriginValid, isDestValid, origin.lat, origin.lng, destination.lat, destination.lng, validWaypoints, preference, roundTrip, onRouteMetrics, onPathUpdated]);
 
   // 2. Render dual-layer polyline and fit bounds immediately whenever path or map changes
   useEffect(() => {
@@ -214,6 +231,8 @@ export function GoogleMapRouteDirector({
       corePolylineRef.current.setMap(map);
     }
 
+    if(returnPolylineRef.current){returnPolylineRef.current.setMap(null);returnPolylineRef.current=null;}
+    if(returnPath.length>1){returnPolylineRef.current=new google.maps.Polyline({path:returnPath,strokeColor:'#B99555',strokeWeight:4,strokeOpacity:.9,zIndex:12,map});}
     // Auto-fit camera bounds to encompass the entire route
     try {
       const bounds = new google.maps.LatLngBounds();
@@ -221,6 +240,7 @@ export function GoogleMapRouteDirector({
       bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
       validWaypoints.forEach(w => bounds.extend(new google.maps.LatLng(w.lat, w.lng)));
       activeCoords.forEach(pt => bounds.extend(new google.maps.LatLng(pt.lat, pt.lng)));
+      returnPath.forEach(pt=>bounds.extend(new google.maps.LatLng(pt.lat,pt.lng)));
       
       map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 });
     } catch {
@@ -230,11 +250,12 @@ export function GoogleMapRouteDirector({
     return () => {
       // Note: we retain polylines during updates to avoid flicker
     };
-  }, [map, directionsPath, validatedBasePath, origin.lat, origin.lng, destination.lat, destination.lng, validWaypoints]);
+  }, [map, directionsPath, validatedBasePath, origin.lat, origin.lng, destination.lat, destination.lng, validWaypoints, returnPath]);
 
   // Clean up completely on unmount
   useEffect(() => {
     return () => {
+      if(returnPolylineRef.current){returnPolylineRef.current.setMap(null);returnPolylineRef.current=null;}
       if (casingPolylineRef.current) {
         casingPolylineRef.current.setMap(null);
         casingPolylineRef.current = null;
