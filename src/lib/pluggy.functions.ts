@@ -120,7 +120,7 @@ type PAccount = {
   currencyCode: string;
   creditData?: { creditLimit?: number; availableCreditLimit?: number; brand?: string; balanceDueDate?: string; balanceCloseDate?: string } | null;
 };
-type PTx = { id: string; description: string; amount: number; date: string; type: "DEBIT" | "CREDIT"; category?: string | null; status?: string | null; billId?: string | null; creditCardMetadata?: { installmentNumber?: number | null; totalInstallments?: number | null } | null; installmentNumber?: number | null; totalInstallments?: number | null };
+type PTx = { id: string; description: string; amount: number; date: string; type: "DEBIT" | "CREDIT"; category?: string | null; status?: string | null; billId?: string | null; billForecastDate?: string | null; billPostDate?: string | null; creditCardMetadata?: { installmentNumber?: number | null; totalInstallments?: number | null; billForecastDate?: string | null; billPostDate?: string | null } | null; installmentNumber?: number | null; totalInstallments?: number | null };
 
 export type FinanceAccount = {
   id: string;
