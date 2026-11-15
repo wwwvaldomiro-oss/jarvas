@@ -60,8 +60,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Axion — Gestão pessoal e financeira" },
-      { name: "description", content: "Controle suas contas e cartões em um só lugar com Open Finance." },
+      { title: "Órion — Seu assistente pessoal" },
+      { name: "description", content: "Gestão pessoal e financeira, agenda e planejamento em um só lugar." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
