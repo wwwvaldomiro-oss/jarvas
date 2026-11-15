@@ -412,12 +412,12 @@ export const importBillsCsv = createServerFn({ method: "POST" })
 /** Totais anuais independentes do exercício aberto na grade mensal. */
 export const getAnnualIndicatorTotals = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input:unknown)=>z.object({year:z.number().int().min(2000).max(2100)}).parse(input))
+  .handler(async ({ context, data }) => {
     const {supabase,userId}=context as Ctx;
-    // O ano é definido pelo servidor no fuso do Axion, nunca pelo filtro da grade.
-    const currentYear = Number(new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/Sao_Paulo", year: "numeric",
-    }).format(new Date()));
+    // O ano selecionado na grade define o primeiro exercício apurado.
+    // Nunca transporta baixas ou faturas dos exercícios anteriores.
+    const currentYear = data.year;
     // PostgREST limita respostas a mil linhas por padrão. Paginar para não perder parcelas.
     async function allPages(makeQuery:()=>any) {
       const result:any[]=[];

@@ -107,11 +107,30 @@ function AnuaisPage() {
   const futureCardQuery = useQuery({queryKey:["card-installment-forecast",year],queryFn:()=>previewCardsFn({data:{year}}),enabled:!!user && cardProfilesAvailable && year>=new Date().getFullYear(),staleTime:300000});
   const q = useQuery({ queryKey: ["annual", year], queryFn: () => getFn({ data: { year } }), enabled: !!user });
   const indicatorQuery = useQuery({
-    queryKey:["annual-indicators",currentYear],
-    queryFn:()=>indicatorFn(), enabled:!!user,
+    queryKey:["annual-indicators",year],
+    queryFn:()=>indicatorFn({data:{year}}), enabled:!!user,
   });
   const memorialData=memorial ? indicatorQuery.data?.[memorial.scope] : null;
   const memorialDetails:IndicatorDetail[]=memorialData?.details??[];
+  // Memorial executivo: uma linha por credor/categoria, nunca fatura a fatura.
+  const memorialByCreditor=[...memorialDetails.reduce((map,row)=>{
+    const key=`${row.category}:${row.creditor.trim().toLocaleLowerCase("pt-BR")}`;
+    const existing=map.get(key);
+    if(existing){
+      existing.expected+=row.expected;
+      existing.paid+=row.paid;
+      existing.open+=row.open;
+      existing.months++;
+      existing.lastYear=Math.max(existing.lastYear,row.year);
+      existing.firstYear=Math.min(existing.firstYear,row.year);
+    }else map.set(key,{creditor:row.creditor,category:row.category,expected:row.expected,
+      paid:row.paid,open:row.open,months:1,firstYear:row.year,lastYear:row.year});
+    return map;
+  },new Map<string,{creditor:string;category:string;expected:number;paid:number;open:number;months:number;firstYear:number;lastYear:number}>()).values()]
+    .sort((a,b)=>a.category.localeCompare(b.category,"pt-BR")||a.creditor.localeCompare(b.creditor,"pt-BR"));
+  const cardLimits=(walletQuery.data?.accounts??[]).filter(a=>a.type==="CREDIT").map(a=>({
+    name:a.name,usedCents:Math.round(Math.max(0,a.creditLimit-a.available)*100),
+  }));
   const memorialTitle=memorial?.metric==="expected"?"Total geral previsto"
     :memorial?.metric==="paid"?"Valor efetivamente pago":"Saldo a pagar";
   const memorialSum=memorialDetails.reduce((total,row)=>total+(memorial?.metric==="expected"
@@ -468,7 +487,7 @@ function AnuaisPage() {
             className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
             <h2 className="text-lg font-bold tracking-tight text-foreground">Compromissos apurados</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              De {indicatorQuery.data?.currentYear??currentYear} em diante, sem incluir exercícios anteriores. Clique em um indicador para ver o memorial.
+              Do exercício {indicatorQuery.data?.currentYear??year} em diante. Exercícios anteriores e seus pagamentos não entram na apuração. Clique para conferir a relação das dívidas.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
@@ -487,7 +506,7 @@ function AnuaisPage() {
 
           <section aria-label="Despesas para esse ano"
             className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
-            <h2 className="text-lg font-bold tracking-tight text-foreground">Despesas para esse ano</h2>
+            <h2 className="text-lg font-bold tracking-tight text-foreground">Despesas do exercício {year}</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.expected) : "—"}
@@ -520,43 +539,54 @@ function AnuaisPage() {
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 {memorial?.scope==="current"
-                  ? `Exercício ${indicatorQuery.data?.currentYear??currentYear} (janeiro a dezembro).`
-                  : `Do exercício ${indicatorQuery.data?.currentYear??currentYear} até o último ano com compromissos cadastrados.`}
+                  ? `Exercício ${indicatorQuery.data?.currentYear??year} (janeiro a dezembro).`
+                  : `Do exercício ${indicatorQuery.data?.currentYear??year} até o último ano com compromissos cadastrados.`}
                 {" "}Anos anteriores são excluídos da apuração, mas permanecem no histórico.
               </p>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-semibold">{memorialDetails.length} competências incluídas</span>
+                <span className="text-sm font-semibold">{memorialByCreditor.length} credores apurados</span>
                 <strong className="text-lg tabular-nums">{formatBRL(memorialSum)}</strong>
               </div>
               <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[860px] text-xs">
+                <table className="w-full min-w-[780px] text-xs">
                   <thead className="sticky top-0 bg-muted text-muted-foreground">
                     <tr>
-                      <th className="px-2 py-2 text-left">Ano / mês</th>
-                      <th className="px-2 py-2 text-left">Credor</th>
-                      <th className="px-2 py-2 text-left">Origem</th>
-                      <th className="px-2 py-2 text-right">Previsto</th>
-                      <th className="px-2 py-2 text-right">Pago</th>
-                      <th className="px-2 py-2 text-right">Saldo</th>
-                      <th className="px-2 py-2 text-left">Situação</th>
+                      <th className="px-2 py-2 text-left">Tipo de dívida</th>
+                      <th className="px-2 py-2 text-left">Credor / cartão / contrato</th>
+                      <th className="px-2 py-2 text-left">Exercícios</th>
+                      <th className="px-2 py-2 text-right">Total previsto</th>
+                      <th className="px-2 py-2 text-right">Total pago</th>
+                      <th className="px-2 py-2 text-right">Saldo devido</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {memorialDetails.map(row=><tr key={`${row.expenseId}:${row.year}:${row.month}`}>
-                      <td className="whitespace-nowrap px-2 py-2">{MONTHS_SHORT[row.month-1]}/{row.year}</td>
-                      <td className="px-2 py-2 font-medium">{row.creditor}</td>
+                    {memorialByCreditor.map(row=><tr key={`${row.category}:${row.creditor}`}>
                       <td className="px-2 py-2 text-muted-foreground">{row.category}</td>
+                      <td className="px-2 py-2 font-medium">{row.creditor}</td>
+                      <td className="whitespace-nowrap px-2 py-2">{row.firstYear===row.lastYear?row.firstYear:`${row.firstYear}–${row.lastYear}`}</td>
                       <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.expected)}</td>
                       <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.paid)}</td>
-                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.open)}</td>
-                      <td className="px-2 py-2">{row.settled?"Quitado":row.paid>0?"Parcial":"Em aberto"}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right font-semibold tabular-nums">{formatBRL(row.open)}</td>
                     </tr>)}
-                    {memorialDetails.length===0&&<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Nenhuma competência encontrada para este período.</td></tr>}
+                    {memorialByCreditor.length===0&&<tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Nenhuma dívida cadastrada no período.</td></tr>}
                   </tbody>
                 </table>
               </div>
+              {cardLimits.length>0&&<div className="space-y-2">
+                <h3 className="text-sm font-semibold">Cartões — limite utilizado informado pelo Open Finance</h3>
+                <p className="text-xs text-muted-foreground">
+                  Posição atual das carteiras, apenas para referência. Não é somada novamente às dívidas
+                  anuais nem representa pagamentos ou faturas previstas de {year}.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {cardLimits.map(card=><div key={card.name} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
+                    <span className="font-medium">{card.name}</span>
+                    <span className="whitespace-nowrap tabular-nums">{formatBRL(card.usedCents)}</span>
+                  </div>)}
+                </div>
+              </div>}
               <p className="text-xs text-muted-foreground">
-                Fonte exclusiva: Despesas Anuais. Cada competência é somada uma vez; pagamentos parciais reduzem o saldo sem indicar quitação integral.
+                O total é a soma dos credores cadastrados em Despesas Anuais a partir de {year}. Pagamentos anteriores a {year} são excluídos. Limites utilizados do Open Finance são apenas referência e não entram no somatório.
               </p>
             </div>
           </DialogContent>
