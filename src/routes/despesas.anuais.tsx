@@ -64,7 +64,7 @@ function AnuaisPage() {
   const currentYear = Number(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo", year: "numeric",
   }).format(new Date()));
-  const [editCell, setEditCell] = useState<{ id: string; month: number; value: string } | null>(null);
+  const [editCell, setEditCell] = useState<{ id: string; month: number; value: string; persistId?: string } | null>(null);
   const [editCreditor, setEditCreditor] = useState<CreditorDraft | null>(null);
   const [savingCreditor, setSavingCreditor] = useState(false);
   const [updatingContracts, setUpdatingContracts] = useState(false);
@@ -148,7 +148,7 @@ function AnuaisPage() {
     if (!monthsByRow.has(id)) monthsByRow.set(id,new Map());
     const cells = monthsByRow.get(id)!;
     // Valor oficial da competência tem precedência; jamais duplicar uma fatura fechada.
-    if ((!cells.has(f.month) || cells.get(f.month)===null || cells.get(f.month)===0) && !(q.data?.paidMonths?.[id] ?? []).includes(f.month)) cells.set(f.month,f.expected_cents);
+    if ((!cells.has(f.month) || cells.get(f.month)===null) && !(q.data?.paidMonths?.[id] ?? []).includes(f.month)) cells.set(f.month,f.expected_cents);
   }
   const monthTotals = Array.from({ length: 12 }, (_, i) =>
     rows.reduce((s: number, r: any) => s + (monthsByRow.get(r.id)?.get(i + 1) ?? 0), 0));
@@ -183,7 +183,6 @@ function AnuaisPage() {
     if(!r.forecast_only)return r.id;
     if(!r.card_account_id)throw new Error("Cartão sem vínculo Open Finance.");
     const result=await ensureCardFn({data:{accountId:r.card_account_id,year}});
-    refresh();
     return result.id;
   }
   async function beginEditCreditor(r:any,cells:Map<number,number|null>|undefined,total:number){
@@ -193,6 +192,7 @@ function AnuaisPage() {
       const source:SourceKind=["contract","card","consumption","annual_tax"].includes(r.expense_source)
         ?r.expense_source:r.expense_kind==="consumption"?"consumption":"manual";
       const accountId=r.card_account_id??profiles.find(p=>p.annual_expense_id===id)?.account_id??"";
+      refresh();
       setEditCreditor({id,creditor:r.creditor_original??r.creditor,originalCreditor:r.creditor_original??r.creditor,
         dueDay:r.due_day?String(r.due_day):"",expenseSource:source,
         sourceContractId:r.source_contract_id??"",cardAccountId:accountId,
@@ -208,7 +208,7 @@ function AnuaisPage() {
   async function beginEditCell(r:any,month:number,value:number|null|undefined){
     try{
       const id=await editableRow(r);
-      setEditCell({id,month,value:value?(value/100).toFixed(2).replace(".",","):""});
+      setEditCell({id:r.id,persistId:id,month,value:value?(value/100).toFixed(2).replace(".",","):""});
     }catch(e){toast.error(e instanceof Error?e.message:"Falha ao editar o valor.");}
   }
 
@@ -221,7 +221,7 @@ function AnuaisPage() {
       return;
     }
     try {
-      await cellFn({ data: { expenseId: editCell.id, month: editCell.month, expectedCents: cents } });
+      await cellFn({ data: { expenseId: editCell.persistId ?? editCell.id, month: editCell.month, expectedCents: cents } });
       setEditCell(null);
       refresh();
     } catch (e) {
