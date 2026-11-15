@@ -15,7 +15,7 @@ import type { IndicatorTrendPoint } from "@/lib/finance/annual-indicators";
 import {
   addCreditor, deleteCreditor, getAnnualYear, getAnnualIndicatorTotals, setYearArchived, updateAnnualCell, updateCreditor,
 } from "@/lib/finance/finance.functions";
-import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualConsumption } from "@/lib/finance/annual-projections.functions";
+import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualConsumption, populateLinkedAnnualContracts, extendOneYearFixedConsumption } from "@/lib/finance/annual-projections.functions";
 import { scheduleAnnualTax } from "@/lib/finance/annual-tax.functions";
 import { annualTaxSchedule } from "@/lib/finance/annual-tax";
 import { getFinances } from "@/lib/pluggy.functions";
@@ -66,6 +66,8 @@ function AnuaisPage() {
   const [editCell, setEditCell] = useState<{ id: string; month: number; value: string } | null>(null);
   const [editCreditor, setEditCreditor] = useState<CreditorDraft | null>(null);
   const [savingCreditor, setSavingCreditor] = useState(false);
+  const [updatingContracts, setUpdatingContracts] = useState(false);
+  const [extendingConsumption, setExtendingConsumption] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingCreditor, setDeletingCreditor] = useState(false);
@@ -86,6 +88,8 @@ function AnuaisPage() {
   const previewCardsFn = useServerFn(previewFutureCardInstallments);
   const projectContractFn = useServerFn(projectAnnualContract);
   const projectConsumptionFn = useServerFn(projectFixedAnnualConsumption);
+  const populateContractsFn = useServerFn(populateLinkedAnnualContracts);
+  const extendConsumptionFn = useServerFn(extendOneYearFixedConsumption);
   const scheduleTaxFn = useServerFn(scheduleAnnualTax);
   const contractsQuery = useQuery({queryKey:["annual-contract-choices"],queryFn:()=>contractsFn(),enabled:!!user});
   const walletQuery = useQuery({queryKey:["finances"],queryFn:()=>walletFn(),enabled:!!user});
@@ -297,6 +301,31 @@ function AnuaisPage() {
     } finally {setSavingCreditor(false);}
   }
 
+  async function updateAllFutureContracts() {
+    if(updatingContracts)return;
+    setUpdatingContracts(true);
+    try {
+      const result=await populateContractsFn();
+      toast.success(`Contratos: ${result.created} competências criadas e ${result.preserved} preservadas.`);
+      if(result.warnings.length) toast.warning(result.warnings.slice(0,4).join(" | "));
+      refresh();
+    }catch(e){toast.error(e instanceof Error?e.message:"Falha ao projetar contratos.");}
+    finally{setUpdatingContracts(false);}
+  }
+
+  async function extendFixedYear() {
+    if(!editCreditor || extendingConsumption || editCreditor.expenseSource!=="consumption" || editCreditor.consumptionValueType!=="fixed")return;
+    const cents=parseBRL(editCreditor.fixedValue);
+    if(cents===null || cents<=0){toast.error("Informe a mensalidade fixa válida antes de acrescentar o ano.");return;}
+    setExtendingConsumption(true);
+    try {
+      const result=await extendConsumptionFn({data:{expenseId:editCreditor.id,monthlyCents:cents}});
+      toast.success(`Consumo fixo: ${result.created} meses acrescentados em ${result.year}.`);
+      refresh();
+    }catch(e){toast.error(e instanceof Error?e.message:"Não foi possível acrescentar o ano.");}
+    finally{setExtendingConsumption(false);}
+  }
+
   function closeCreditorEditor() {
     if (deletingCreditor || savingCreditor) return;
     setEditCreditor(null);
@@ -333,6 +362,7 @@ function AnuaisPage() {
             <Link to="/home-broker"><Button variant="outline">Registro de pagamento <ArrowRight /></Button></Link>
             <Link to="/despesas/parceladas"><Button variant="brand">Contratos parcelados <ArrowRight /></Button></Link>
             <Link to="/historico-pagamentos"><Button variant="outline">Histórico de pagamentos</Button></Link>
+            <Button variant="outline" disabled={updatingContracts} onClick={()=>void updateAllFutureContracts()}><RefreshCcw className="size-4"/>{updatingContracts?"Atualizando…":"Atualizar anos futuros"}</Button>
           </div>
         </div>
 
@@ -671,6 +701,7 @@ function AnuaisPage() {
                   <Input id="ec-fixed" inputMode="decimal" placeholder="0,00"
                     value={editCreditor.fixedValue} onChange={e=>setEditCreditor({...editCreditor,fixedValue:e.target.value})}/>
                   <p className="text-xs text-muted-foreground">Projeção até dezembro do último ano de contratos; meses já preenchidos permanecem inalterados.</p>
+                  <Button type="button" variant="outline" disabled={extendingConsumption || savingCreditor} onClick={()=>void extendFixedYear()}>{extendingConsumption?"Adicionando…":"Adicionar +1 ano (12 meses)"}</Button>
                 </div>}
                 {editCreditor.consumptionValueType==="variable" &&
                   <p className="text-xs text-muted-foreground">Valores de cada mês são informados manualmente quando apurados. Não serão inventadas faturas futuras.</p>}
