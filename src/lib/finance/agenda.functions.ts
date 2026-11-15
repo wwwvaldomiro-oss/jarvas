@@ -10,7 +10,7 @@ const recordSchema = z.object({ id: z.string().uuid().optional(), kind: z.enum([
 export const getPersonalAgenda = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).handler(async ({context}) => {
   const [records, checks] = await Promise.all([context.supabase.from('agenda_records').select('*').order('created_at'), context.supabase.from('agenda_checks').select('*')]);
   if (records.error || checks.error) throw new Error('Não foi possível carregar a agenda pessoal.');
-  return { records: (records.data ?? []).map(r => ({...r, items: r.items as unknown as PersonalRecord['items'], kind: r.kind as PersonalRecord['kind']})), checks: checks.data ?? [] };
+  return { records: (records.data ?? []).map(r => ({...r, items: r.items as unknown as PersonalRecord['items'], work_details: (r.work_details ?? {}) as PersonalRecord['work_details'], kind: r.kind as PersonalRecord['kind']})), checks: checks.data ?? [] };
 });
 export const savePersonalAgenda = createServerFn({method:'POST'}).middleware([requireSupabaseAuth]).inputValidator((v:unknown) => recordSchema.parse(v)).handler(async ({data,context}) => {
   const {id,...fields} = data;
