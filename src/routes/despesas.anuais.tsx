@@ -19,7 +19,7 @@ import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualCons
 import { scheduleAnnualTax } from "@/lib/finance/annual-tax.functions";
 import { annualTaxSchedule } from "@/lib/finance/annual-tax";
 import { getFinances } from "@/lib/pluggy.functions";
-import { getFinanceAccountProfiles, saveFinanceAccountProfile, syncProviderClosedCardInvoices, previewFutureCardInstallments } from "@/lib/finance/card-profile.functions";
+import { getFinanceAccountProfiles, saveFinanceAccountProfile, syncProviderClosedCardInvoices, previewFutureCardInstallments, syncFutureCardInstallments } from "@/lib/finance/card-profile.functions";
 
 export const Route = createFileRoute("/despesas/anuais")({
   ssr: false,
@@ -87,6 +87,11 @@ function AnuaisPage() {
   const saveProfileFn = useServerFn(saveFinanceAccountProfile);
   const syncCardsFn = useServerFn(syncProviderClosedCardInvoices);
   const previewCardsFn = useServerFn(previewFutureCardInstallments);
+  const syncFutureFn = useServerFn(syncFutureCardInstallments);
+  // Mantém as faturas futuras sempre atualizadas: sincroniza ao abrir a página.
+  useQuery({queryKey:["card-future-sync"],queryFn:async()=>{
+    const r=await syncFutureFn(); void qc.invalidateQueries({queryKey:["annual"]}); return r;
+  },enabled:!!user,staleTime:600000,retry:false});
   const projectContractFn = useServerFn(projectAnnualContract);
   const projectConsumptionFn = useServerFn(projectFixedAnnualConsumption);
   const populateContractsFn = useServerFn(populateLinkedAnnualContracts);
@@ -210,6 +215,9 @@ function AnuaisPage() {
     setSyncingCards(true);
     try {
       const result = await syncCardsFn();
+      const fut = await syncFutureFn();
+      if (fut.warnings.length) toast.warning(`Parcelas futuras: ${fut.warnings.join("; ").slice(0,300)}`);
+      else toast.success(`Parcelas futuras atualizadas em ${fut.cards} cartão(ões).`);
       if (result.linkedCards === 0) toast.warning("Nenhum cartão vinculado a Despesas Anuais. Use o lápis de cada credor para selecionar o cartão.");
       else if (result.errors.length) toast.warning(`Sincronização parcial: ${result.updated} atualizadas, ${result.unchanged} sem alteração, ${result.skipped} ignoradas. ${result.errors.length} erro(s): ${result.errors.join("; ").slice(0,350)}`);
       else toast.success(`Faturas: ${result.updated} atualizadas, ${result.unchanged} sem alteração, ${result.skipped} ignoradas.`);
