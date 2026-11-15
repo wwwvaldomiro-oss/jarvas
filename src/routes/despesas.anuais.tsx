@@ -15,7 +15,7 @@ import type { IndicatorTrendPoint } from "@/lib/finance/annual-indicators";
 import {
   addCreditor, deleteCreditor, getAnnualYear, getAnnualIndicatorTotals, setYearArchived, updateAnnualCell, updateCreditor,
 } from "@/lib/finance/finance.functions";
-import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualConsumption, populateLinkedAnnualContracts, extendOneYearFixedConsumption } from "@/lib/finance/annual-projections.functions";
+import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualConsumption, populateLinkedAnnualContracts, extendFixedConsumptionThroughYear } from "@/lib/finance/annual-projections.functions";
 import { scheduleAnnualTax } from "@/lib/finance/annual-tax.functions";
 import { annualTaxSchedule } from "@/lib/finance/annual-tax";
 import { getFinances } from "@/lib/pluggy.functions";
@@ -68,6 +68,7 @@ function AnuaisPage() {
   const [savingCreditor, setSavingCreditor] = useState(false);
   const [updatingContracts, setUpdatingContracts] = useState(false);
   const [extendingConsumption, setExtendingConsumption] = useState(false);
+  const [consumptionThroughYear, setConsumptionThroughYear] = useState(currentYear + 1);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingCreditor, setDeletingCreditor] = useState(false);
@@ -89,7 +90,7 @@ function AnuaisPage() {
   const projectContractFn = useServerFn(projectAnnualContract);
   const projectConsumptionFn = useServerFn(projectFixedAnnualConsumption);
   const populateContractsFn = useServerFn(populateLinkedAnnualContracts);
-  const extendConsumptionFn = useServerFn(extendOneYearFixedConsumption);
+  const extendConsumptionFn = useServerFn(extendFixedConsumptionThroughYear);
   const scheduleTaxFn = useServerFn(scheduleAnnualTax);
   const contractsQuery = useQuery({queryKey:["annual-contract-choices"],queryFn:()=>contractsFn(),enabled:!!user});
   const walletQuery = useQuery({queryKey:["finances"],queryFn:()=>walletFn(),enabled:!!user});
@@ -313,16 +314,17 @@ function AnuaisPage() {
     finally{setUpdatingContracts(false);}
   }
 
-  async function extendFixedYear() {
+  async function extendFixedThroughYear() {
     if(!editCreditor || extendingConsumption || editCreditor.expenseSource!=="consumption" || editCreditor.consumptionValueType!=="fixed")return;
     const cents=parseBRL(editCreditor.fixedValue);
-    if(cents===null || cents<=0){toast.error("Informe a mensalidade fixa válida antes de acrescentar o ano.");return;}
+    if(cents===null || cents<=0){toast.error("Informe uma mensalidade fixa válida antes de projetar os anos.");return;}
     setExtendingConsumption(true);
     try {
-      const result=await extendConsumptionFn({data:{expenseId:editCreditor.id,monthlyCents:cents}});
-      toast.success(`Consumo fixo: ${result.created} meses acrescentados em ${result.year}.`);
+      const result=await extendConsumptionFn({data:{expenseId:editCreditor.id,monthlyCents:cents,throughYear:consumptionThroughYear}});
+      if(result.created===0) toast.info(`Consumo fixo já projetado até ${result.alreadyCoveredThrough}; nenhum mês existente foi alterado.`);
+      else toast.success(`Consumo fixo projetado até ${result.year}: ${result.created} meses criados e ${result.preserved} preservados.`);
       refresh();
-    }catch(e){toast.error(e instanceof Error?e.message:"Não foi possível acrescentar o ano.");}
+    }catch(e){toast.error(e instanceof Error?e.message:"Não foi possível projetar o consumo até o ano selecionado.");}
     finally{setExtendingConsumption(false);}
   }
 
@@ -701,7 +703,17 @@ function AnuaisPage() {
                   <Input id="ec-fixed" inputMode="decimal" placeholder="0,00"
                     value={editCreditor.fixedValue} onChange={e=>setEditCreditor({...editCreditor,fixedValue:e.target.value})}/>
                   <p className="text-xs text-muted-foreground">Projeção até dezembro do último ano de contratos; meses já preenchidos permanecem inalterados.</p>
-                  <Button type="button" variant="outline" disabled={extendingConsumption || savingCreditor} onClick={()=>void extendFixedYear()}>{extendingConsumption?"Adicionando…":"Adicionar +1 ano (12 meses)"}</Button>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-32 space-y-1">
+                      <Label htmlFor="ec-through-year">Projetar até o ano</Label>
+                      <select id="ec-through-year" className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        value={consumptionThroughYear} disabled={extendingConsumption || savingCreditor}
+                        onChange={e=>setConsumptionThroughYear(Number(e.target.value))}>
+                        {Array.from({length:2100-currentYear+1},(_,i)=>currentYear+i).map(yy=><option key={yy} value={yy}>{yy}</option>)}
+                      </select>
+                    </div>
+                    <Button type="button" variant="outline" disabled={extendingConsumption || savingCreditor} onClick={()=>void extendFixedThroughYear()}>{extendingConsumption?"Projetando…":"Gerar até o ano selecionado"}</Button>
+                  </div>
                 </div>}
                 {editCreditor.consumptionValueType==="variable" &&
                   <p className="text-xs text-muted-foreground">Valores de cada mês são informados manualmente quando apurados. Não serão inventadas faturas futuras.</p>}
