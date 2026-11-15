@@ -192,3 +192,70 @@ export async function extendFixedConsumptionsForNewContract(supabase:any,userId:
   }
   return {extended,warnings};
 }
+
+
+/**
+ * Atualiza TODOS os contratos já vinculados em Despesas Anuais.
+ * Nunca vincula credores por similaridade de nome e nunca sobrescreve meses existentes.
+ * Cada contrato é projetado até o último vencimento realmente cadastrado.
+ */
+export const populateLinkedAnnualContracts = createServerFn({method:"POST"})
+.middleware([requireSupabaseAuth])
+.handler(async({context})=>{
+  const {supabase,userId}=context as Ctx;
+  const {data:contracts,error:contractError}=await supabase.from("installment_contracts")
+    .select("id,name,archived_at").eq("user_id",userId).is("archived_at",null);
+  if(contractError)throw new Error(contractError.message);
+  const {data:rows,error:rowError}=await supabase.from("annual_expenses")
+    .select("*").eq("user_id",userId).eq("expense_source","contract")
+    .not("source_contract_id","is",null).order("year",{ascending:true});
+  if(rowError)throw new Error(rowError.message);
+  const done=new Set<string>();
+  let created=0,preserved=0;
+  const warnings:string[]=[];
+  for(const contract of contracts??[]){
+    const base=(rows??[]).find((r:any)=>r.source_contract_id===contract.id);
+    if(!base){warnings.push(contract.name+": sem vínculo com credor anual");continue;}
+    if(done.has(contract.id))continue;
+    done.add(contract.id);
+    try {
+      const {data:entries,error}=await supabase.from("installment_entries")
+        .select("due_date,expected_cents").eq("user_id",userId)
+        .eq("contract_id",contract.id).order("due_date");
+      if(error)throw new Error(error.message);
+      const plan=contractProjection(entries??[],base.year);
+      if(!plan.length)continue;
+      const result=await materialize(supabase,userId,base,plan,"contract",contract.id);
+      created+=result.created;
+      preserved+=result.preserved;
+    }catch(e){warnings.push(contract.name+": "+(e instanceof Error?e.message:"Falha na projeção"));}
+  }
+  return {created,preserved,linked:done.size,warnings};
+});
+
+/** Adiciona precisamente o próximo exercício de 12 competências ao consumo fixo indicado. */
+export const extendOneYearFixedConsumption = createServerFn({method:"POST"})
+.middleware([requireSupabaseAuth])
+.inputValidator((input:unknown)=>z.object({expenseId:uuid,monthlyCents:z.number().int().positive().max(999999999999)}).parse(input))
+.handler(async({context,data})=>{
+  const {supabase,userId}=context as Ctx;
+  const row=await sourceRow(supabase,userId,data.expenseId);
+  if(row.expense_kind!=="consumption" || row.consumption_value_type!=="fixed")
+    throw new Error("Disponível apenas para consumo fixo.");
+  const template=row.source_template_id??row.id;
+  const {data:history,error:historyError}=await supabase.from("annual_expenses")
+    .select("*").eq("user_id",userId).eq("expense_kind","consumption")
+    .eq("consumption_value_type","fixed").eq("source_template_id",template)
+    .order("year",{ascending:false});
+  if(historyError)throw new Error(historyError.message);
+  const latest=(history??[]).reduce((a:any,b:any)=>!a||a.year<b.year?b:a,row);
+  const nextYear=latest.year+1;
+  if(nextYear>2100)throw new Error("Horizonte máximo 2100.");
+  const plan=fixedConsumptionProjection(nextYear,nextYear,data.monthlyCents);
+  const result=await materialize(supabase,userId,latest,plan,"consumption");
+  await supabase.rpc("audit_append",{
+    p_action:"extend_fixed_consumption_one_year",p_entity_type:"annual_expense",p_entity_id:row.id,
+    p_before:null,p_after:{nextYear,...result},p_details:{source:"fixed_consumption"}
+  });
+  return {year:nextYear,...result};
+});
