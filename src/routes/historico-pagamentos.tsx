@@ -127,7 +127,7 @@ function HistoricoPage() {
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Controle financeiro</div>
             <h1 className="text-3xl font-extrabold">Histórico de Pagamentos</h1>
-            <p className="text-sm text-muted-foreground">Pagamentos confirmados, agrupados pelo mês de vencimento.</p>
+            <p className="text-sm text-muted-foreground">Pagamentos confirmados</p>
           </div>
           <div className="no-print flex flex-wrap items-start gap-2">
             <div className="relative">
