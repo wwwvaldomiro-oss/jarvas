@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, Coins, CreditCard, Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
+import { Wallet, CalendarDays, CarFront, Plane, ChartNoAxesCombined, Eye, EyeOff, Lock, Mail, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -12,9 +12,9 @@ import { Logo } from "@/components/Logo";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Entrar — Axion" },
-      { name: "description", content: "Entre ou crie sua conta Axion e controle contas e cartões via Open Finance." },
-      { property: "og:title", content: "Entrar — Axion" },
+      { title: "Entrar — Órion" },
+      { name: "description", content: "Órion, seu assistente pessoal para organizar sua vida e suas finanças." },
+      { property: "og:title", content: "Entrar — Órion" },
       { property: "og:description", content: "Controle de contas e cartões via Open Finance." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -23,11 +23,7 @@ export const Route = createFileRoute("/")({
   component: AuthPage,
 });
 
-const features = [
-  { icon: Coins, title: "Receitas" },
-  { icon: CreditCard, title: "Despesas" },
-  { icon: BarChart3, title: "Planejamento" },
-];
+const features = [{icon:Wallet,title:"Finanças"},{icon:CalendarDays,title:"Agenda"},{icon:CarFront,title:"Veículos"},{icon:Plane,title:"Viagens"},{icon:ChartNoAxesCombined,title:"Planejamento"}];
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -77,68 +73,14 @@ function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-hero px-5 py-12 text-hero-foreground">
-      <svg viewBox="0 0 600 300" className="pointer-events-none absolute inset-x-0 bottom-0 w-full text-gold opacity-25" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-        <path d="M0 200 C150 150 250 260 400 230 S560 170 600 180" />
-        <path d="M0 240 C180 200 300 290 600 220" opacity="0.6" />
-      </svg>
-      <div className="relative w-full max-w-md">
-        <div className="mb-8 flex justify-center"><Logo tone="light" /></div>
-        <div className="axion-login-glass rounded-3xl p-8 sm:p-10">
-          <h1 className="text-center text-3xl font-semibold">
-            {mode === "login" ? <>Bem-vindo <span className="text-gold-gradient">de volta</span></> : "Crie sua conta"}
-          </h1>
-          <p className="mt-2 text-center text-sm text-hero-foreground/60">
-            {mode === "login" ? "Entre na sua conta para continuar." : "Leva menos de um minuto."}
-          </p>
-
-          <form onSubmit={submit} className="mt-8 space-y-5">
-            {mode === "signup" && (
-              <div className="space-y-2">
-                <Label className="text-hero-foreground/80" htmlFor="name">Nome</Label>
-                <Input id="name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} required placeholder="Seu nome" />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label className="text-hero-foreground/80" htmlFor="email">E-mail</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="email" type="email" className="h-11 pl-10" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="seu@email.com" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-hero-foreground/80" htmlFor="pw">Senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input id="pw" type={show ? "text" : "password"} minLength={6} className="h-11 px-10" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Digite sua senha" />
-                <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label="Mostrar senha">
-                  {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-            <Button type="submit" variant="brand" className="h-11 w-full" disabled={loading}>
-              {mode === "login" ? "Entrar" : "Criar conta"} <ArrowRight />
-            </Button>
-          </form>
-
-          <div className="my-6 flex items-center gap-3 text-xs text-hero-foreground/50">
-            <div className="h-px flex-1 bg-gold/25" />ou<div className="h-px flex-1 bg-gold/25" />
-          </div>
-          <Button variant="outline" className="h-11 w-full border-gold/30 bg-transparent text-hero-foreground hover:bg-gold/10 hover:text-hero-foreground" onClick={google}>
-            <GoogleIcon /> Continuar com Google
-          </Button>
-
-          <p className="mt-8 text-center text-sm text-hero-foreground/60">
-            {mode === "login" ? "Não tem uma conta? " : "Já tem conta? "}
-            <button className="font-semibold text-gold" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-              {mode === "login" ? "Criar conta grátis" : "Entrar"}
-            </button>
-          </p>
-        </div>
-        <div className="mt-8 flex justify-center gap-6 text-xs text-hero-foreground/55">
-          {features.map((f) => <span key={f.title} className="flex items-center gap-1.5"><f.icon className="size-3.5 text-gold" />{f.title}</span>)}
-        </div>
-      </div>
+    <div className="orion-auth">
+      <section className="orion-auth-story" aria-label="Apresentação do Órion">
+        <div><div className="mb-12"><Logo tone="light" size="lg"/></div><h1 className="orion-auth-title">Órion, seu assistente pessoal.<br/><span className="orion-auth-highlight">Tome melhores decisões sobre seu dinheiro.</span></h1><p className="orion-auth-description">Conheça seus gastos, sua rotina e seus compromissos. Planeje seu patrimônio e seus objetivos, tudo em um só lugar.</p></div>
+        <div className="orion-auth-globe" aria-hidden="true"><svg viewBox="0 0 900 400" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="og" cx="45%" cy="32%" r="68%"><stop stopColor="#345b6e"/><stop offset=".6" stopColor="#143447"/><stop offset="1" stopColor="#091b2b"/></radialGradient><clipPath id="oc"><circle cx="450" cy="465" r="345"/></clipPath></defs><circle cx="450" cy="465" r="345" fill="url(#og)" stroke="#B99555" strokeWidth="2"/><g clipPath="url(#oc)" fill="none" stroke="#8fa8b6" strokeWidth="1" opacity=".4"><ellipse cx="450" cy="465" rx="135" ry="345"/><ellipse cx="450" cy="465" rx="260" ry="345"/><path d="M105 335Q450 235 795 335M105 240Q450 115 795 240M105 400H795"/></g><g clipPath="url(#oc)" fill="#b2a07a" opacity=".76"><path d="M280 170 330 145 380 165 406 195 390 220 421 245 401 275 375 263 367 295 347 300 335 272 307 265 296 228 265 221 251 188Z"/><path d="M413 270 452 253 492 279 513 315 508 345 483 377 481 402 463 430 450 403 452 365 434 344Z"/><path d="M525 165 576 144 635 157 680 185 704 220 674 235 650 216 610 226 585 207 553 218 532 194Z"/></g><g fill="none" stroke="#B99555" strokeWidth="1.5" opacity=".8"><path d="M80 290Q320 20 620 270"/><path d="M160 340Q470 40 800 295"/><path d="M270 328Q570 70 780 228"/></g><g fill="#E7E1D5" stroke="#B99555"><circle cx="80" cy="290" r="4"/><circle cx="620" cy="270" r="4"/><circle cx="160" cy="340" r="4"/><circle cx="800" cy="295" r="4"/></g></svg></div>
+        <div className="orion-auth-features">{features.map(f=><div key={f.title} className="orion-auth-feature"><f.icon aria-hidden="true"/><span>{f.title}</span></div>)}</div>
+      </section>
+      <section className="orion-auth-panel" aria-label="Acesso à conta"><div className="orion-auth-form"><div className="mb-9 flex flex-col items-center"><Logo size="lg"/><p className="mt-5 text-center text-sm text-muted-foreground">Sua vida e suas finanças, com mais clareza.</p></div><h2 className="text-center text-3xl font-semibold">{mode==="login"?"Acesse sua conta":"Crie sua conta"}</h2><p className="mt-2 text-center text-sm text-muted-foreground">{mode==="login"?"Continue com segurança.":"Comece a organizar seus objetivos."}</p>
+      <form onSubmit={submit} className="mt-8 space-y-4">{mode==="signup"&&<div className="space-y-2"><Label htmlFor="name">Nome</Label><Input id="name" className="h-11" value={name} onChange={e=>setName(e.target.value)} required autoComplete="name" placeholder="Seu nome"/></div>}<div className="space-y-2"><Label htmlFor="email">E-mail</Label><div className="relative"><Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="email" type="email" autoComplete="email" className="h-11 pl-10" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="Seu e-mail"/></div></div><div className="space-y-2"><Label htmlFor="pw">Senha</Label><div className="relative"><Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"/><Input id="pw" type={show?"text":"password"} autoComplete={mode==="login"?"current-password":"new-password"} minLength={6} className="h-11 px-10" value={password} onChange={e=>setPassword(e.target.value)} required placeholder="Sua senha"/><button type="button" onClick={()=>setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label={show?"Ocultar senha":"Mostrar senha"}>{show?<EyeOff className="size-4"/>:<Eye className="size-4"/>}</button></div></div><Button type="submit" className="orion-action h-11 w-full" disabled={loading}>{mode==="login"?"Entrar":"Criar conta"}<ArrowRight/></Button></form><div className="my-6 flex items-center gap-3 text-xs text-muted-foreground"><div className="h-px flex-1 bg-border"/>ou<div className="h-px flex-1 bg-border"/></div><Button variant="outline" className="h-11 w-full bg-white" onClick={google}><GoogleIcon/> Continuar com Google</Button><p className="mt-8 text-center text-sm text-muted-foreground">{mode==="login"?"Não tem uma conta? ":"Já tem uma conta? "}<button type="button" className="font-semibold text-[#906f37]" onClick={()=>setMode(mode==="login"?"signup":"login")}>{mode==="login"?"Criar conta":"Entrar"}</button></p></div></section>
     </div>
   );
 }
