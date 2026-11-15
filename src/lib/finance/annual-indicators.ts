@@ -29,7 +29,9 @@ export function calculateAnnualIndicators(input:{
   const byPeriod=new Map<string,{paid:number;settled:boolean;explicitOpen:boolean}>();
   for(const p of input.payments){
     const y=p.source_annual_id?rowYears.get(p.source_annual_id):undefined;
-    if(!y||!p.source_period||!p.paid_date||!p.source_period.startsWith(`${y}-`)) continue;
+    if(!y||!p.source_period||!p.paid_date||!p.source_period.startsWith(`${y}-`) ||
+      p.paid_date < `${input.currentYear}-01-01` ||
+      (input.scope==="current" && p.paid_date > `${input.currentYear}-12-31`)) continue;
     const key=`${p.source_annual_id}:${p.source_period}`;
     const prev=byPeriod.get(key);
     const amount=Math.max(0,Math.round(Number(p.paid_cents)||0));
