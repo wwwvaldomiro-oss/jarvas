@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatBRL, parseBRL } from "@/lib/finance/money";
 import { calculateCreditorAnnualColumn } from "@/lib/finance/annual-column";
-import type { IndicatorTrendPoint } from "@/lib/finance/annual-indicators";
+import type { IndicatorDetail, IndicatorTrendPoint } from "@/lib/finance/annual-indicators";
 import {
   addCreditor, deleteCreditor, ensureAnnualCardYearForEdit, getAnnualYear, getAnnualIndicatorTotals, setYearArchived, updateAnnualCell, updateCreditor,
 } from "@/lib/finance/finance.functions";
@@ -75,6 +75,7 @@ function AnuaisPage() {
   const [deletingCreditor, setDeletingCreditor] = useState(false);
   const [syncingCards, setSyncingCards] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [memorial, setMemorial] = useState<{scope:"all"|"current";metric:IndicatorMetric}|null>(null);
 
   const getFn = useServerFn(getAnnualYear);
   const indicatorFn = useServerFn(getAnnualIndicatorTotals);
@@ -109,6 +110,12 @@ function AnuaisPage() {
     queryKey:["annual-indicators",currentYear],
     queryFn:()=>indicatorFn(), enabled:!!user,
   });
+  const memorialData=memorial ? indicatorQuery.data?.[memorial.scope] : null;
+  const memorialDetails:IndicatorDetail[]=memorialData?.details??[];
+  const memorialTitle=memorial?.metric==="expected"?"Total geral previsto"
+    :memorial?.metric==="paid"?"Valor efetivamente pago":"Saldo a pagar";
+  const memorialSum=memorialDetails.reduce((total,row)=>total+(memorial?.metric==="expected"
+    ?row.expected:memorial?.metric==="paid"?row.paid:row.open),0);
   const savedRows = q.data?.rows ?? [];
   const cardCreditors = savedRows.filter((r: {id:string;creditor:string;expense_source?:string|null}) => r.expense_source === "card");
   const unlinkedCardCreditors = cardProfilesAvailable
@@ -460,18 +467,21 @@ function AnuaisPage() {
           <section aria-label="Compromissos apurados"
             className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
             <h2 className="text-lg font-bold tracking-tight text-foreground">Compromissos apurados</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              De {indicatorQuery.data?.currentYear??currentYear} em diante, sem incluir exercícios anteriores. Clique em um indicador para ver o memorial.
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.all.expected) : "—"}
-                trend={indicatorQuery.data?.all.trend} metric="expected" />
+                trend={indicatorQuery.data?.all.trend} metric="expected" onClick={()=>setMemorial({scope:"all",metric:"expected"})} />
               <Summary label="Valor efetivamente pago"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.all.paid) : "—"}
                 trend={indicatorQuery.data?.all.trend} metric="paid"
-                totalExpected={indicatorQuery.data?.all.expected} tone="text-success" />
+                totalExpected={indicatorQuery.data?.all.expected} tone="text-success" onClick={()=>setMemorial({scope:"all",metric:"paid"})} />
               <Summary label="Saldo a pagar"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.all.open) : "—"}
                 trend={indicatorQuery.data?.all.trend} metric="open"
-                totalExpected={indicatorQuery.data?.all.expected} tone="text-destructive" />
+                totalExpected={indicatorQuery.data?.all.expected} tone="text-destructive" onClick={()=>setMemorial({scope:"all",metric:"open"})} />
             </div>
           </section>
 
@@ -481,15 +491,15 @@ function AnuaisPage() {
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.expected) : "—"}
-                trend={indicatorQuery.data?.current.trend} metric="expected" />
+                trend={indicatorQuery.data?.current.trend} metric="expected" onClick={()=>setMemorial({scope:"current",metric:"expected"})} />
               <Summary label="Valor efetivamente pago"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.paid) : "—"}
                 trend={indicatorQuery.data?.current.trend} metric="paid"
-                totalExpected={indicatorQuery.data?.current.expected} tone="text-success" />
+                totalExpected={indicatorQuery.data?.current.expected} tone="text-success" onClick={()=>setMemorial({scope:"current",metric:"paid"})} />
               <Summary label="Saldo a pagar"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.open) : "—"}
                 trend={indicatorQuery.data?.current.trend} metric="open"
-                totalExpected={indicatorQuery.data?.current.expected} tone="text-destructive" />
+                totalExpected={indicatorQuery.data?.current.expected} tone="text-destructive" onClick={()=>setMemorial({scope:"current",metric:"open"})} />
             </div>
           </section>
         </div>
@@ -502,6 +512,56 @@ function AnuaisPage() {
           </p>
         )}
         {futureCardQuery.data?.warnings.map((warning,i)=><p role="alert" key={i} className="mt-2 text-xs text-amber-700">{warning}</p>)}
+        <Dialog open={memorial!==null} onOpenChange={open=>{if(!open)setMemorial(null);}}>
+          <DialogContent className="max-h-[85vh] max-w-5xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Memorial de cálculo — {memorialTitle}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {memorial?.scope==="current"
+                  ? `Exercício ${indicatorQuery.data?.currentYear??currentYear} (janeiro a dezembro).`
+                  : `Do exercício ${indicatorQuery.data?.currentYear??currentYear} até o último ano com compromissos cadastrados.`}
+                {" "}Anos anteriores são excluídos da apuração, mas permanecem no histórico.
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                <span className="text-sm font-semibold">{memorialDetails.length} competências incluídas</span>
+                <strong className="text-lg tabular-nums">{formatBRL(memorialSum)}</strong>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-[860px] text-xs">
+                  <thead className="sticky top-0 bg-muted text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-2 text-left">Ano / mês</th>
+                      <th className="px-2 py-2 text-left">Credor</th>
+                      <th className="px-2 py-2 text-left">Origem</th>
+                      <th className="px-2 py-2 text-right">Previsto</th>
+                      <th className="px-2 py-2 text-right">Pago</th>
+                      <th className="px-2 py-2 text-right">Saldo</th>
+                      <th className="px-2 py-2 text-left">Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {memorialDetails.map(row=><tr key={`${row.expenseId}:${row.year}:${row.month}`}>
+                      <td className="whitespace-nowrap px-2 py-2">{MONTHS_SHORT[row.month-1]}/{row.year}</td>
+                      <td className="px-2 py-2 font-medium">{row.creditor}</td>
+                      <td className="px-2 py-2 text-muted-foreground">{row.category}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.expected)}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.paid)}</td>
+                      <td className="whitespace-nowrap px-2 py-2 text-right tabular-nums">{formatBRL(row.open)}</td>
+                      <td className="px-2 py-2">{row.settled?"Quitado":row.paid>0?"Parcial":"Em aberto"}</td>
+                    </tr>)}
+                    {memorialDetails.length===0&&<tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Nenhuma competência encontrada para este período.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fonte exclusiva: Despesas Anuais. Cada competência é somada uma vez; pagamentos parciais reduzem o saldo sem indicar quitação integral.
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <div className="mt-6 overflow-x-auto rounded-2xl border bg-card shadow-soft">
           <table className="w-full min-w-[1280px] table-fixed text-xs lg:text-[12px]">
             <thead>
@@ -806,15 +866,18 @@ function IndicatorTrend({trend,metric,label}:{
   );
 }
 
-function Summary({ label, value, tone, trend, metric, totalExpected }: {
+function Summary({ label, value, tone, trend, metric, totalExpected, onClick }: {
   label:string;value:string;tone?:string|undefined;
-  trend?:IndicatorTrendPoint[]|undefined;metric:IndicatorMetric;totalExpected?:number|undefined;
+  trend?:IndicatorTrendPoint[]|undefined;metric:IndicatorMetric;totalExpected?:number|undefined;onClick?:()=>void;
 }) {
   const amount=trend?.reduce((sum,point)=>sum+point[metric],0)??0;
   const percentage=totalExpected && totalExpected>0
     ? Math.max(0,Math.min(100,amount/totalExpected*100)):0;
   return (
-    <div className={`min-w-0 rounded-xl border bg-card p-3 shadow-sm ${tone??"text-primary"}`}>
+    <div role={onClick?"button":undefined} tabIndex={onClick?0:undefined}
+      onClick={onClick} onKeyDown={onClick?e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onClick();}}:undefined}
+      aria-label={onClick?`Abrir memorial de cálculo de ${label}`:undefined}
+      className={`min-w-0 rounded-xl border bg-card p-3 shadow-sm ${onClick?"cursor-pointer hover:border-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary":""} ${tone??"text-primary"}`}>
       <p className="min-h-8 text-[10px] font-semibold uppercase leading-4 tracking-wide text-muted-foreground">
         {label}
       </p>
