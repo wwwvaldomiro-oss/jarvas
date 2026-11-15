@@ -122,7 +122,7 @@ function AnuaisPage() {
     .map(card => ({
       id:`forecast:${card.accountId}:${year}`,
       creditor:card.creditor, creditor_original:card.creditor,
-      expense_source:"card", expense_kind:"debt", due_day:null,
+      expense_source:"card", expense_kind:"debt", due_day:card.dueDay ?? null,
       forecast_only:true, card_account_id:card.accountId
     }));
   const rows = [...savedRows,...virtualCardRows];
