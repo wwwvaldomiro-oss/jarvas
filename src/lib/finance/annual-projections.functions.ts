@@ -259,3 +259,37 @@ export const extendOneYearFixedConsumption = createServerFn({method:"POST"})
   });
   return {year:nextYear,...result};
 });
+
+
+/** Projeta consumo fixo até o exercício selecionado, preservando todas as competências existentes. */
+export const extendFixedConsumptionThroughYear = createServerFn({method:"POST"})
+.middleware([requireSupabaseAuth])
+.inputValidator((input:unknown)=>z.object({
+  expenseId:uuid,
+  monthlyCents:z.number().int().positive().max(999999999999),
+  throughYear:z.number().int().min(2020).max(2100),
+}).parse(input))
+.handler(async({context,data})=>{
+  const {supabase,userId}=context as Ctx;
+  const row=await sourceRow(supabase,userId,data.expenseId);
+  if(row.expense_kind!=="consumption" || row.consumption_value_type!=="fixed")
+    throw new Error("Disponível apenas para consumo fixo.");
+  const template=row.source_template_id??row.id;
+  const {data:history,error:historyError}=await supabase.from("annual_expenses")
+    .select("*").eq("user_id",userId).eq("expense_kind","consumption")
+    .eq("consumption_value_type","fixed").eq("source_template_id",template)
+    .order("year",{ascending:false});
+  if(historyError)throw new Error(historyError.message);
+  const latest=(history??[]).reduce((a:any,b:any)=>!a||a.year<b.year?b:a,row);
+  if(data.throughYear<=latest.year)
+    return {year:data.throughYear,alreadyCoveredThrough:latest.year,created:0,preserved:0,years:[] as number[]};
+  if(data.throughYear-latest.year>75)
+    throw new Error("Selecione um ano dentro dos próximos 75 exercícios.");
+  const plan=fixedConsumptionProjection(latest.year+1,data.throughYear,data.monthlyCents);
+  const result=await materialize(supabase,userId,latest,plan,"consumption");
+  await supabase.rpc("audit_append",{
+    p_action:"extend_fixed_consumption_through_year",p_entity_type:"annual_expense",p_entity_id:row.id,
+    p_before:null,p_after:{throughYear:data.throughYear,...result},p_details:{source:"fixed_consumption"}
+  });
+  return {year:data.throughYear,alreadyCoveredThrough:data.throughYear,...result};
+});
