@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Archive, ArchiveRestore, Plus, Trash2, Pencil, RefreshCcw } from "lucide-react";
+import { ArrowRight, Archive, ArchiveRestore, ChevronDown, Plus, Printer, Trash2, Pencil, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, useRequireUser } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -422,7 +423,7 @@ function AnuaisPage() {
 
   return (
     <AppShell active="anuais" user={user}>
-      <div className="p-6 lg:p-8">
+      <div className="annual-print-root p-6 lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Controle financeiro</div>
@@ -432,7 +433,32 @@ function AnuaisPage() {
             <Link to="/home-broker"><Button variant="outline">Registro de pagamento <ArrowRight /></Button></Link>
             <Link to="/despesas/parceladas"><Button variant="brand">Contratos parcelados <ArrowRight /></Button></Link>
             <Link to="/historico-pagamentos"><Button variant="outline">Histórico de pagamentos</Button></Link>
-            <Button variant="outline" disabled={updatingContracts} onClick={()=>void updateAllFutureContracts()}><RefreshCcw className="size-4"/>{updatingContracts?"Atualizando…":"Atualizar anos futuros"}</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" aria-label="Abrir ações de despesas anuais">
+                  Ações <ChevronDown className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuItem disabled={syncingCards || !cardProfilesAvailable}
+                  onSelect={() => { void syncCards(); }}>
+                  <RefreshCcw className="mr-2 size-4" />{syncingCards?"Sincronizando…":"Sincronizar faturas"}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={updatingContracts}
+                  onSelect={() => { void updateAllFutureContracts(); }}>
+                  <RefreshCcw className="mr-2 size-4" />{updatingContracts?"Atualizando…":"Atualizar anos futuros"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => { void toggleArchive(); }}>
+                  {archived?<ArchiveRestore className="mr-2 size-4"/>:<Archive className="mr-2 size-4"/>}
+                  {archived?"Reabrir exercício":"Arquivar exercício"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={q.isLoading || !!q.error}
+                  onSelect={() => window.print()}>
+                  <Printer className="mr-2 size-4" />Imprimir / Gerar PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -448,21 +474,9 @@ function AnuaisPage() {
               ))}
             </select>
           </div>
-          <Button variant="outline" size="sm" disabled={syncingCards || !cardProfilesAvailable} onClick={()=>void syncCards()}><RefreshCcw className="size-4" /> {syncingCards?"Atualizando...":"Sincronizar faturas"}</Button>
-          <Button variant="outline" size="sm" onClick={toggleArchive}>
-            {archived ? <><ArchiveRestore />Reabrir exercício</> : <><Archive />Arquivar exercício</>}
-          </Button>
         </div>
 
         {q.error && <p role="alert" className="mt-3 rounded-lg border border-destructive/30 p-3 text-sm text-destructive">Falha ao carregar Despesas Anuais: {q.error.message}</p>}
-        {unlinkedCardCreditors.length > 0 && (
-          <p role="status" className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-foreground">
-            <strong>Cartões sem vínculo Open Finance:</strong>{" "}
-            {unlinkedCardCreditors.map((r: {creditor:string})=>r.creditor).join(", ")}.
-            Use o lápis do credor para escolher o cartão correto em Carteiras.
-            Nenhum valor será substituído até existir um vínculo confirmado e uma fatura fechada.
-          </p>
-        )}
         {cardProfileQuery.data?.available === false && (
           <p role="alert" className="mt-3 rounded-lg border border-amber-500/40 p-3 text-sm">
             Vínculos e sincronização de cartões temporariamente indisponíveis: falta a tabela
@@ -482,14 +496,11 @@ function AnuaisPage() {
 
         {indicatorQuery.error && <p role="alert" className="mt-6 text-destructive">Falha na apuração de Despesas Anuais: {indicatorQuery.error.message}</p>}
 
-        <div className="mt-6 grid gap-4 xl:grid-cols-2" aria-busy={indicatorQuery.isFetching}>
+        <div className="mt-6 grid items-stretch gap-4 xl:grid-cols-2" aria-busy={indicatorQuery.isFetching}>
           <section aria-label="Compromissos apurados"
-            className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
+            className="flex min-w-0 flex-col rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
             <h2 className="text-lg font-bold tracking-tight text-foreground">Compromissos apurados</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Do exercício {indicatorQuery.data?.currentYear??year} em diante. Exercícios anteriores e seus pagamentos não entram na apuração. Clique para conferir a relação das dívidas.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid flex-1 items-stretch gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.all.expected) : "—"}
                 trend={indicatorQuery.data?.all.trend} metric="expected" onClick={()=>setMemorial({scope:"all",metric:"expected"})} />
@@ -505,9 +516,9 @@ function AnuaisPage() {
           </section>
 
           <section aria-label="Despesas para esse ano"
-            className="min-w-0 rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
+            className="flex min-w-0 flex-col rounded-2xl border bg-card/70 p-4 shadow-soft sm:p-5">
             <h2 className="text-lg font-bold tracking-tight text-foreground">Despesas do exercício {year}</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid flex-1 items-stretch gap-3 sm:grid-cols-3">
               <Summary label="Total geral previsto"
                 value={indicatorQuery.data ? formatBRL(indicatorQuery.data.current.expected) : "—"}
                 trend={indicatorQuery.data?.current.trend} metric="expected" onClick={()=>setMemorial({scope:"current",metric:"expected"})} />
@@ -592,8 +603,13 @@ function AnuaisPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="mt-6 overflow-x-auto rounded-2xl border bg-card shadow-soft">
-          <table className="w-full min-w-[1280px] table-fixed text-xs lg:text-[12px]">
+        <div className="annual-print-sheet mt-6 overflow-x-auto rounded-2xl border bg-card shadow-soft"
+          style={{"--annual-print-scale":String(Math.min(1,62/Math.max(rows.length+2,1)))} as React.CSSProperties}>
+          <div className="annual-print-heading hidden">
+            <h1>ÓRION — Despesas anuais</h1>
+            <p>Exercício {year} • Situação: {archived?"Arquivado":"Em andamento"} • Valores em R$</p>
+          </div>
+          <table className="annual-print-table w-full min-w-[1280px] table-fixed text-xs lg:text-[12px]">
             <thead>
               <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="sticky left-0 z-10 w-[174px] bg-muted px-2 py-2.5 text-left">Credor</th>
