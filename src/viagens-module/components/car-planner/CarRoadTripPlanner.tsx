@@ -34,7 +34,9 @@ import {
   ExternalLink,
   LocateFixed,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Save,
+  FolderOpen
 } from 'lucide-react';
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import { 
@@ -139,6 +141,10 @@ export function CarRoadTripPlanner({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGpsModalOpen, setIsGpsModalOpen] = useState(false);
+  const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
+  const [savedRoutes, setSavedRoutes] = useState<Array<{id:string;name:string;origin:RouteWaypoint;destination:RouteWaypoint;stops:RouteWaypoint[];vehicle:VehicleCategoryId;fuel:FuelTypeId;price:number;consumption:number}>>(() => {
+    try { const parsed = JSON.parse(localStorage.getItem('orion.savedCarRoutes.v1') || '[]'); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+  });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Interactive Fallback Map Zoom/Pan
@@ -257,6 +263,23 @@ export function CarRoadTripPlanner({
     showNotification(`Rota configurada: ${preset.name} (${preset.highway})`);
   };
 
+  const saveCurrentRoute = () => {
+    const name = window.prompt('Nome da rota para salvar:', originWaypoint.name + ' → ' + destWaypoint.name);
+    if (!name?.trim()) return;
+    const next = [{id: String(Date.now()),name:name.trim(),origin:originWaypoint,destination:destWaypoint,stops:intermediateStops,vehicle:selectedVehicle,fuel:selectedFuel,price:customFuelPrice,consumption:customKmPerL}, ...savedRoutes];
+    try { localStorage.setItem('orion.savedCarRoutes.v1',JSON.stringify(next)); setSavedRoutes(next); showNotification('Rota salva neste navegador'); }
+    catch { showNotification('Não foi possível salvar: armazenamento indisponível'); }
+  };
+  const loadSavedRoute = (route: typeof savedRoutes[number]) => {
+    setOriginWaypoint(route.origin); setDestWaypoint(route.destination); setIntermediateStops(route.stops);
+    setSelectedVehicle(route.vehicle); setSelectedFuel(route.fuel); setCustomFuelPrice(route.price); setCustomKmPerL(route.consumption);
+    setSavedRoutesOpen(false); showNotification('Rota carregada: ' + route.name);
+  };
+  const deleteSavedRoute = (id: string) => {
+    const next = savedRoutes.filter(route => route.id !== id);
+    try { localStorage.setItem('orion.savedCarRoutes.v1',JSON.stringify(next)); setSavedRoutes(next); } catch { showNotification('Não foi possível excluir a rota'); }
+  };
+
   // Swap Origin and Destination
   const handleSwapPoints = () => {
     const temp = { ...originWaypoint, label: 'A' };
@@ -368,20 +391,10 @@ export function CarRoadTripPlanner({
             </div>
           </div>
 
-          {/* Quick preset routes pills */}
-          <div className="hidden xl:flex items-center gap-1.5 overflow-x-auto text-xs py-1">
-            <span className="text-slate-400 text-[11px] mr-1">Rotas Rápidas:</span>
-            {PRESET_ROUTES.slice(0, 5).map((p, idx) => (
-              <button
-                key={idx}
-                onClick={() => applyPresetRoute(p)}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 rounded-lg text-[11px] font-semibold transition-colors shrink-0 border border-slate-700/60 cursor-pointer"
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={saveCurrentRoute} className="flex items-center gap-1.5 rounded-lg bg-[#B99555] px-3 py-2 text-xs font-bold text-[#0C1928]"><Save className="size-4"/> Salvar rota</button>
+            <button type="button" onClick={() => setSavedRoutesOpen(true)} className="flex items-center gap-1.5 rounded-lg border border-[#B99555]/40 px-3 py-2 text-xs font-bold text-white"><FolderOpen className="size-4"/> Rotas salvas ({savedRoutes.length})</button>
           </div>
-
           {/* Right Actions: Enviar p/ GPS + Compartilhar Rota */}
           <div className="flex items-center gap-2">
             <button
@@ -405,12 +418,12 @@ export function CarRoadTripPlanner({
       </header>
 
       {/* Main Workspace: Left Panel + Right Map */}
-      <div className="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden shadow-xl bg-white border-x border-slate-200">
+      <div className="flex-1 w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden shadow-xl bg-white border-x border-slate-200">
         
         {/* ======================================================== */}
         {/* LEFT PANEL: Inputs, Costs, Plazas Accordions (Cols 1-5) */}
         {/* ======================================================== */}
-        <aside className="lg:col-span-5 border-r border-slate-200 flex flex-col bg-white max-h-[calc(100vh-64px)] overflow-y-auto">
+        <aside className="lg:col-span-4 xl:col-span-3 border-r border-slate-200 flex flex-col bg-white max-h-[calc(100vh-64px)] overflow-y-auto">
           <div className="p-4 sm:p-5 space-y-4">
             
             {/* 1. Smart Waypoint Search Inputs (Origin, Intermediate Stops, Destination) */}
@@ -1045,7 +1058,7 @@ export function CarRoadTripPlanner({
         {/* ======================================================== */}
         {/* RIGHT PANEL: Interactive Map & Live PRF / Toll Plazas    */}
         {/* ======================================================== */}
-        <main className="lg:col-span-7 bg-slate-900 relative flex flex-col min-h-[500px] lg:min-h-[700px] overflow-hidden">
+        <main className="lg:col-span-8 xl:col-span-9 bg-slate-900 relative flex flex-col min-h-[500px] lg:min-h-[700px] overflow-hidden">
           
           {/* Floating Map Controls & Layer Toggles */}
           <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
@@ -1304,6 +1317,21 @@ export function CarRoadTripPlanner({
         </main>
       </div>
 
+      {savedRoutesOpen && <div role="dialog" aria-modal="true" aria-label="Rotas salvas" className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0C1928]/60 p-4" onClick={() => setSavedRoutesOpen(false)}>
+        <div className="w-full max-w-lg rounded-2xl bg-[#F7F8FA] p-5 shadow-2xl" onClick={e=>e.stopPropagation()}>
+          <div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0C1928]"><FolderOpen className="size-5"/> Rotas salvas</h2><button type="button" onClick={()=>setSavedRoutesOpen(false)} aria-label="Fechar" className="rounded-lg px-3 py-1 text-xl">×</button></div>
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto">
+            {savedRoutes.length===0 ? <p className="py-8 text-center text-sm text-slate-600">Nenhuma rota salva. Configure uma viagem e clique em Salvar rota.</p> : savedRoutes.map(route=><div key={route.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="min-w-0 flex-1"><p className="font-semibold text-[#0C1928]">{route.name}</p><p className="text-xs text-slate-500">{route.origin.name} → {route.destination.name}</p></div>
+              <button type="button" onClick={()=>loadSavedRoute(route)} className="rounded-lg bg-[#B99555] px-3 py-2 text-xs font-bold text-[#0C1928]">Usar rota</button>
+              <button type="button" onClick={()=>{loadSavedRoute(route);setIsGpsModalOpen(true);}} className="rounded-lg border px-2 py-2 text-xs">Enviar GPS</button>
+              <button type="button" onClick={()=>{loadSavedRoute(route);setIsShareModalOpen(true);}} className="rounded-lg border px-2 py-2 text-xs">Compartilhar</button>
+              <button type="button" aria-label={'Excluir '+route.name} onClick={()=>deleteSavedRoute(route.id)} className="rounded-lg border px-2 py-2 text-xs text-red-700"><Trash2 className="size-4"/></button>
+            </div>)}
+          </div>
+          <p className="mt-4 text-xs text-slate-500">Rotas armazenadas somente neste navegador. Enviar para GPS abre o aplicativo de navegação compatível.</p>
+        </div>
+      </div>}
       {/* Driver Share Modal */}
       <ShareDriverModal
         route={calculatedRoute}
