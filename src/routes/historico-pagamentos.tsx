@@ -190,7 +190,7 @@ function HistoricoPage() {
             <section key={key} className="mt-6 rounded-2xl border bg-card shadow-soft">
               <div className="flex items-center justify-between px-5 pt-4">
                 <h2 className="text-lg font-bold">{groupLabel(key)}</h2>
-                <span className="text-sm font-semibold text-success">{list.length} pagamentos · {formatBRL(totalPaid)}</span>
+                <span className="text-base font-bold text-success tabular-nums">{list.length} pagamentos · {formatBRL(totalPaid)}</span>
               </div>
               <div className="overflow-x-auto p-5 pt-3">
                 <table className="w-full min-w-[1280px] table-fixed text-sm">
