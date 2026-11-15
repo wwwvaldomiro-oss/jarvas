@@ -159,17 +159,17 @@ export const previewFutureCardInstallments = createServerFn({method:"GET"})
     if(error)throw new Error(error.message);
     const ids=(profiles??[]).map((p:any)=>p.annual_expense_id);
     const {data:rows,error:rowsError}=await (supabase as any).from("annual_expenses")
-      .select("id,creditor,expense_source,year,due_day")
+      .select("id,creditor,expense_source,year,due_day,source_template_id")
       .eq("user_id",userId).in("id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]);
     if(rowsError)throw new Error(rowsError.message);
     const byId=new Map((rows??[]).map((r:any)=>[r.id,r]));
     const forecasts:Array<{accountId:string;annualExpenseId:string;creditor:string;month:number;expected_cents:number;installments:number}>=[];
     const warnings:string[]=[];
-    const linkedCards:Array<{accountId:string;annualExpenseId:string;creditor:string;dueDay:number|null}>=[];
+    const linkedCards:Array<{accountId:string;annualExpenseId:string;templateId:string;creditor:string;dueDay:number|null}>=[];
     for(const profile of profiles??[]){
       const row:any=byId.get(profile.annual_expense_id);
       if(!row||row.expense_source!=="card")continue;
-      linkedCards.push({accountId:profile.account_id,annualExpenseId:profile.annual_expense_id,creditor:row.creditor,dueDay:row.due_day??null});
+      linkedCards.push({accountId:profile.account_id,annualExpenseId:profile.annual_expense_id,templateId:row.source_template_id??row.id,creditor:row.creditor,dueDay:row.due_day??null});
       try{
         const txs=await fetchAuthorizedCardInstallments(userId,profile.account_id);
         for(const item of projectCardInstallments(txs,data.year,data.year).filter(x=>x.year===data.year))

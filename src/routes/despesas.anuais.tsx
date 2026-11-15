@@ -13,7 +13,7 @@ import { formatBRL, parseBRL } from "@/lib/finance/money";
 import { calculateCreditorAnnualColumn } from "@/lib/finance/annual-column";
 import type { IndicatorTrendPoint } from "@/lib/finance/annual-indicators";
 import {
-  addCreditor, deleteCreditor, getAnnualYear, getAnnualIndicatorTotals, setYearArchived, updateAnnualCell, updateCreditor,
+  addCreditor, deleteCreditor, ensureAnnualCardYearForEdit, getAnnualYear, getAnnualIndicatorTotals, setYearArchived, updateAnnualCell, updateCreditor,
 } from "@/lib/finance/finance.functions";
 import { getAnnualContractChoices, projectAnnualContract, projectFixedAnnualConsumption, populateLinkedAnnualContracts, extendFixedConsumptionThroughYear } from "@/lib/finance/annual-projections.functions";
 import { scheduleAnnualTax } from "@/lib/finance/annual-tax.functions";
@@ -45,6 +45,7 @@ type CreditorDraft = {
   expenseSource: SourceKind; sourceContractId: string; cardAccountId: string;
   consumptionValueType: "fixed" | "variable"; fixedValue: string;
   annualTaxKind: AnnualTaxKind; taxTotal: string; taxFirstMonth: number; taxInstallments: number;
+  projectionCard?: boolean;
 };
 type ContractChoice = { id: string; name: string };
 type CardChoice = { id: string; name: string };
@@ -63,7 +64,7 @@ function AnuaisPage() {
   const currentYear = Number(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo", year: "numeric",
   }).format(new Date()));
-  const [editCell, setEditCell] = useState<{ id: string; month: number; value: string } | null>(null);
+  const [editCell, setEditCell] = useState<{ id: string; month: number; value: string; persistId?: string } | null>(null);
   const [editCreditor, setEditCreditor] = useState<CreditorDraft | null>(null);
   const [savingCreditor, setSavingCreditor] = useState(false);
   const [updatingContracts, setUpdatingContracts] = useState(false);
@@ -78,6 +79,7 @@ function AnuaisPage() {
   const getFn = useServerFn(getAnnualYear);
   const indicatorFn = useServerFn(getAnnualIndicatorTotals);
   const cellFn = useServerFn(updateAnnualCell);
+  const ensureCardFn = useServerFn(ensureAnnualCardYearForEdit);
   const updCredFn = useServerFn(updateCreditor);
   const delCredFn = useServerFn(deleteCreditor);
   const archiveFn = useServerFn(setYearArchived);
@@ -118,14 +120,17 @@ function AnuaisPage() {
   // metadados de parcelas. Nunca presumir valores nem associar por nome.
   const linkedFutureCards = futureCardQuery.data?.linkedCards ?? [];
   const virtualCardRows = linkedFutureCards
-    .filter(card => !savedRows.some((r: {id:string}) => r.id === card.annualExpenseId))
+    .filter(card => !savedRows.some((r:any) =>
+      r.id===card.annualExpenseId || (r.expense_source==="card" && r.source_template_id===card.templateId)))
     .map(card => ({
       id:`forecast:${card.accountId}:${year}`,
       creditor:card.creditor, creditor_original:card.creditor,
       expense_source:"card", expense_kind:"debt", due_day:card.dueDay ?? null,
       forecast_only:true, card_account_id:card.accountId
     }));
-  const rows = [...savedRows,...virtualCardRows];
+  const rows = [...savedRows.map((r:any)=>({...r,card_account_id:profiles.find(p=>
+    p.annual_expense_id===r.id || (r.source_template_id && p.annual_expense_id===r.source_template_id))?.account_id
+    ??linkedFutureCards.find(card=>card.annualExpenseId===r.id||card.templateId===r.source_template_id)?.accountId??null})),...virtualCardRows];
   const archived = !!q.data?.year?.archived_at;
   // Ano já terminado ou encerrado manualmente: Total anual representa apenas baixas quitadas.
   const closedYear = archived || year < currentYear;
@@ -138,11 +143,13 @@ function AnuaisPage() {
   }
   for (const f of cardForecasts) {
     const matching = profiles.find(p=>p.account_id===f.accountId);
-    const id = savedRows.some((r: {id:string})=>r.id===matching?.annual_expense_id) ? matching!.annual_expense_id! : `forecast:${f.accountId}:${year}`;
+    const physical=savedRows.find((r:any)=>r.expense_source==="card" &&
+      (r.id===matching?.annual_expense_id || r.source_template_id===linkedFutureCards.find(card=>card.accountId===f.accountId)?.templateId));
+    const id=physical?.id??`forecast:${f.accountId}:${year}`;
     if (!monthsByRow.has(id)) monthsByRow.set(id,new Map());
     const cells = monthsByRow.get(id)!;
     // Valor oficial da competência tem precedência; jamais duplicar uma fatura fechada.
-    if ((!cells.has(f.month) || cells.get(f.month)===null || cells.get(f.month)===0) && !(q.data?.paidMonths?.[id] ?? []).includes(f.month)) cells.set(f.month,f.expected_cents);
+    if ((!cells.has(f.month) || cells.get(f.month)===null) && !(q.data?.paidMonths?.[id] ?? []).includes(f.month)) cells.set(f.month,f.expected_cents);
   }
   const monthTotals = Array.from({ length: 12 }, (_, i) =>
     rows.reduce((s: number, r: any) => s + (monthsByRow.get(r.id)?.get(i + 1) ?? 0), 0));
@@ -173,6 +180,39 @@ function AnuaisPage() {
     void qc.invalidateQueries({ queryKey: ["card-installment-forecast",year] });
   }
 
+  async function editableRow(r:any):Promise<string>{
+    if(!r.forecast_only)return r.id;
+    if(!r.card_account_id)throw new Error("Cartão sem vínculo Open Finance.");
+    const result=await ensureCardFn({data:{accountId:r.card_account_id,year}});
+    return result.id;
+  }
+  async function beginEditCreditor(r:any,cells:Map<number,number|null>|undefined,total:number){
+    try{
+      const id=await editableRow(r);
+      const latest=Array.from({length:12},(_,i)=>cells?.get(12-i)??null).find(v=>v!==null&&v>0);
+      const source:SourceKind=["contract","card","consumption","annual_tax"].includes(r.expense_source)
+        ?r.expense_source:r.expense_kind==="consumption"?"consumption":"manual";
+      const accountId=r.card_account_id??profiles.find(p=>p.annual_expense_id===id)?.account_id??"";
+      refresh();
+      setEditCreditor({id,creditor:r.creditor_original??r.creditor,originalCreditor:r.creditor_original??r.creditor,
+        dueDay:r.due_day?String(r.due_day):"",expenseSource:source,
+        sourceContractId:r.source_contract_id??"",cardAccountId:accountId,
+        consumptionValueType:r.consumption_value_type==="variable"?"variable":"fixed",
+        fixedValue:latest?(latest/100).toFixed(2).replace(".",","):"",
+        annualTaxKind:["iptu","ipva","other"].includes(r.annual_tax_kind)?r.annual_tax_kind:"iptu",
+        taxTotal:source==="annual_tax"&&total>0?(total/100).toFixed(2).replace(".",","):"",
+        taxFirstMonth:Array.from({length:12},(_,i)=>i+1).find(m=>(cells?.get(m)??0)>0)??1,
+        taxInstallments:Math.max(1,Array.from({length:12},(_,i)=>i+1).filter(m=>(cells?.get(m)??0)>0).length),
+        projectionCard:source==="card"&&!!accountId&&!profiles.some(p=>p.annual_expense_id===id)});
+    }catch(e){toast.error(e instanceof Error?e.message:"Falha ao editar cartão.");}
+  }
+  async function beginEditCell(r:any,month:number,value:number|null|undefined){
+    try{
+      const id=await editableRow(r);
+      setEditCell({id:r.id,persistId:id,month,value:value?(value/100).toFixed(2).replace(".",","):""});
+    }catch(e){toast.error(e instanceof Error?e.message:"Falha ao editar o valor.");}
+  }
+
   async function commitCell() {
     if (!editCell) return;
     const trimmed = editCell.value.trim();
@@ -182,7 +222,7 @@ function AnuaisPage() {
       return;
     }
     try {
-      await cellFn({ data: { expenseId: editCell.id, month: editCell.month, expectedCents: cents } });
+      await cellFn({ data: { expenseId: editCell.persistId ?? editCell.id, month: editCell.month, expectedCents: cents } });
       setEditCell(null);
       refresh();
     } catch (e) {
@@ -248,7 +288,7 @@ function AnuaisPage() {
       toast.error("Não é possível salvar o vínculo enquanto a tabela finance_account_profiles estiver indisponível.");
       return;
     }
-    if(editCreditor.expenseSource==="card" && !editCreditor.cardAccountId) {
+    if(editCreditor.expenseSource==="card" && !editCreditor.cardAccountId && !editCreditor.projectionCard) {
       toast.error("Selecione um cartão conectado ao Open Finance.");return;
     }
     if(editCreditor.expenseSource==="annual_tax" && editCreditor.taxTotal.trim()) {
@@ -272,8 +312,10 @@ function AnuaisPage() {
         consumptionValueType:editCreditor.consumptionValueType,
         annualTaxKind:editCreditor.expenseSource==="annual_tax"?editCreditor.annualTaxKind:null,
       }});
-      await syncCardLink(editCreditor.id,editCreditor.cardAccountId,editCreditor.expenseSource);
-      if(editCreditor.expenseSource==="card") await syncCards();
+      if(!editCreditor.projectionCard){
+        await syncCardLink(editCreditor.id,editCreditor.cardAccountId,editCreditor.expenseSource);
+        if(editCreditor.expenseSource==="card")await syncCards();
+      }
       if(editCreditor.expenseSource==="annual_tax" && editCreditor.taxTotal.trim()) {
         const amount=parseBRL(editCreditor.taxTotal);
         if(amount===null || amount<=0)throw new Error("Informe o valor anual válido do tributo.");
@@ -483,25 +525,9 @@ function AnuaisPage() {
                   <tr key={r.id}>
                     <td className="sticky left-0 z-10 bg-card px-2 py-1.5">
                       <div className="flex items-center gap-1">
-                        <button type="button" aria-label={`Editar credor ${r.creditor}`} title={r.forecast_only?"Previsão: somente leitura":"Classificar e ajustar credor"}
-                          disabled={archived || r.forecast_only} className="shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-40"
-                          onClick={() => {
-                            const latest = Array.from({length:12},(_,i)=>cells?.get(12-i)??null).find(v=>v!==null && v>0);
-                            const source:SourceKind = ["contract","card","consumption","annual_tax"].includes(r.expense_source)
-                              ? r.expense_source : r.expense_kind==="consumption" ? "consumption" : "manual";
-                            setEditCreditor({ id:r.id,creditor:r.creditor_original??r.creditor,
-                              originalCreditor:r.creditor_original??r.creditor,
-                              dueDay:r.due_day?String(r.due_day):"",expenseSource:source,
-                              sourceContractId:r.source_contract_id??"",
-                              cardAccountId:profiles.find(p=>p.annual_expense_id===r.id)?.account_id??"",
-                              consumptionValueType:r.consumption_value_type==="variable"?"variable":"fixed",
-                              fixedValue:latest ? (latest/100).toFixed(2).replace(".",","):"",
-                              annualTaxKind:["iptu","ipva","other"].includes(r.annual_tax_kind)?r.annual_tax_kind:"iptu",
-                              taxTotal:source==="annual_tax" && total>0 ? (total/100).toFixed(2).replace(".",","):"",
-                              taxFirstMonth:Array.from({length:12},(_,i)=>i+1).find(m=>((cells?.get(m)??0)>0))??1,
-                              taxInstallments:Math.max(1,Array.from({length:12},(_,i)=>i+1).filter(m=>(cells?.get(m)??0)>0).length),
-                            });
-                          }}>
+                        <button type="button" aria-label={`Editar credor ${r.creditor}`} title={r.forecast_only?"Editar cartão e valores previstos":"Classificar e ajustar credor"}
+                          disabled={archived} className="shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-40"
+                          onClick={() => {void beginEditCreditor(r,cells,total);}}>
                           <Pencil className="size-3.5" />
                         </button>
                         <span title={r.creditor} className="min-w-0 truncate text-xs font-semibold">{r.creditor}</span>
@@ -525,8 +551,8 @@ function AnuaisPage() {
                               : undefined}
                           className={`px-1 py-1 text-right ${isGreen ? "bg-success-soft" : isRed ? "bg-red-500/10" : ""} ${archived ? "" : "cursor-pointer hover:bg-accent"}`}
                           onClick={() => {
-                            if (archived || editing || r.forecast_only) return;
-                            setEditCell({ id: r.id, month, value: v ? (v / 100).toFixed(2).replace(".", ",") : "" });
+                            if (archived || editing) return;
+                             void beginEditCell(r,month,v);
                           }}
                         >
                           {editing ? (
@@ -629,7 +655,7 @@ function AnuaisPage() {
               <div className="space-y-2">
                 <Label htmlFor="ec-kind">Tipo de despesa</Label>
                 <select id="ec-kind" className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                  value={editCreditor.expenseSource} onChange={e=>setEditCreditor({...editCreditor,
+                  value={editCreditor.expenseSource} disabled={editCreditor.projectionCard} onChange={e=>setEditCreditor({...editCreditor,
                     expenseSource:e.target.value as SourceKind})}>
                   <option value="manual">Despesa avulsa / outra obrigação</option>
                   <option value="contract">Contrato parcelado</option>
@@ -650,11 +676,13 @@ function AnuaisPage() {
               {editCreditor.expenseSource==="card" && <div className="space-y-2">
                 <Label htmlFor="ec-card">Cartão vinculado à Carteiras</Label>
                 <select id="ec-card" className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                  value={editCreditor.cardAccountId} onChange={e=>setEditCreditor({...editCreditor,cardAccountId:e.target.value})}>
+                  value={editCreditor.cardAccountId} disabled={editCreditor.projectionCard} onChange={e=>setEditCreditor({...editCreditor,cardAccountId:e.target.value})}>
                   <option value="">Selecionar cartão conectado</option>
                   {cardChoices.map(card=><option key={card.id} value={card.id}>{card.name}</option>)}
                 </select>
-                <p className="text-xs text-muted-foreground">Somente faturas fechadas confirmadas pelo Open Finance serão atualizadas no exercício correspondente.</p>
+                <p className="text-xs text-muted-foreground">{editCreditor.projectionCard
+                    ? "Vínculo Open Finance preservado no cartão original. Neste exercício, edite o nome, vencimento e os valores diretamente nas células."
+                    : "Somente faturas fechadas confirmadas pelo Open Finance serão atualizadas no exercício correspondente."}</p>
                 {!cardProfilesAvailable && <p role="alert" className="text-xs text-amber-700">
                   O vínculo não pode ser alterado antes da migração da tabela finance_account_profiles.
                 </p>}

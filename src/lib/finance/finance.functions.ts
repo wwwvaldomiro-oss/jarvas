@@ -575,6 +575,52 @@ async function assertYearOpen(supabase: any, year: number) {
   if (y?.archived_at) throw new Error("Exercício arquivado: somente leitura.");
 }
 
+/**
+ * Materializa uma única linha anual para edição manual de cartão vinculado.
+ * O vínculo Open Finance permanece no perfil original; a competência futura
+ * é identificada pelo source_template_id e não cria outro perfil/cartão.
+ */
+export const ensureAnnualCardYearForEdit = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    accountId: z.string().min(1).max(120),
+    year: z.number().int().min(2026).max(2100),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as Ctx;
+    await assertYearOpen(supabase, data.year);
+    const { data: profile, error: profileError } = await supabase.from("finance_account_profiles")
+      .select("annual_expense_id").eq("user_id", userId).eq("account_id", data.accountId).maybeSingle();
+    if(profileError) throw new Error(profileError.message);
+    if(!profile?.annual_expense_id) throw new Error("Cartão ainda não vinculado a Despesas Anuais.");
+    const { data: origin, error: originError } = await supabase.from("annual_expenses")
+      .select("id,year,creditor,due_day,expense_source,source_template_id").eq("user_id",userId)
+      .eq("id",profile.annual_expense_id).maybeSingle();
+    if(originError || !origin || origin.expense_source!=="card")
+      throw new Error("Vínculo de cartão não encontrado.");
+    if(data.year===origin.year) return {id:origin.id as string};
+    const template=origin.source_template_id??origin.id;
+    const {data:yearRows,error:yearRowsError}=await supabase.from("annual_expenses")
+      .select("id,creditor,source_template_id,expense_source,position")
+      .eq("user_id",userId).eq("year",data.year).order("position");
+    if(yearRowsError)throw new Error(yearRowsError.message);
+    const linked=(yearRows??[]).filter((r:any)=>r.source_template_id===template && r.expense_source==="card");
+    if(linked.length>1)throw new Error("Existem cartões duplicados neste exercício. Revise antes de editar.");
+    if(linked.length===1)return {id:linked[0].id as string};
+    const collision=(yearRows??[]).find((r:any)=>r.creditor.toLowerCase()===origin.creditor.toLowerCase());
+    if(collision)throw new Error("Já existe um credor com esse nome sem vínculo técnico. Revise antes de editar.");
+    const {error:yearError}=await supabase.from("annual_years").upsert(
+      {user_id:userId,year:data.year},{onConflict:"user_id,year",ignoreDuplicates:true});
+    if(yearError)throw new Error(yearError.message);
+    const {data:created,error:createError}=await supabase.from("annual_expenses").insert({
+      user_id:userId,year:data.year,creditor:origin.creditor,due_day:origin.due_day,
+      position:((yearRows??[]).reduce((v:number,r:any)=>Math.max(v,Number(r.position??-1)),-1))+1,
+      expense_kind:"debt",expense_source:"card",source_template_id:template,
+    }).select("id").single();
+    if(createError)throw new Error(createError.message);
+    return {id:created.id as string};
+  });
+
 export const updateAnnualCell = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
@@ -584,6 +630,13 @@ export const updateAnnualCell = createServerFn({ method: "POST" })
     const { data: row } = await supabase.from("annual_expenses").select("year, creditor").eq("id", data.expenseId).single();
     if (!row) throw new Error("Credor não encontrado");
     await assertYearOpen(supabase, row.year);
+    // Nunca permitir que o ajuste manual de uma previsão altere competência já paga.
+    const period=`${row.year}-${String(data.month).padStart(2,"0")}`;
+    const {data:paid,error:paidError}=await supabase.from("finance_bills")
+      .select("id").eq("source_annual_id",data.expenseId).eq("source_period",period)
+      .not("paid_date","is",null).limit(1);
+    if(paidError)throw new Error("Não foi possível verificar pagamentos existentes: "+paidError.message);
+    if(paid?.length)throw new Error("Competência já paga: corrija o pagamento pelo Histórico de Pagamentos.");
     const { data: before } = await supabase.from("annual_expense_months").select("expected_cents").eq("annual_expense_id", data.expenseId).eq("month", data.month).maybeSingle();
     const { error } = await supabase.from("annual_expense_months").upsert(
       { annual_expense_id: data.expenseId, month: data.month, expected_cents: data.expectedCents },
