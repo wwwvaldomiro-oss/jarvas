@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
-import { ArrowLeft, ArrowRight, Copy, Paperclip, Plus, Printer, Pencil } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Copy, Filter, Paperclip, Plus, Printer, Pencil, Settings, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppShell, useRequireUser } from '@/components/AppShell';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,18 @@ function monthLabel(month: string) {
 function Summary({ label, value, tone = 'text-primary' }: { label: string; value: string; tone?: string }) {
   return <div className="rounded-lg border bg-card p-4 shadow-soft"><div className="text-xs font-medium uppercase text-muted-foreground">{label}</div><div className={`mt-1.5 break-words text-xl font-extrabold ${tone}`}>{value}</div></div>;
 }
+function RevenueAccountingMoney({cents,received=false}:{cents:number;received?:boolean}){
+  const amount=formatBRL(cents).replace(/^R\\$\\s*/,'');
+  return <span className={`inline-grid min-w-[106px] grid-cols-[auto_1fr] items-baseline gap-2 rounded-md px-2 py-1 tabular-nums ${received
+    ?'bg-emerald-50 font-bold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300':'text-foreground'}`}>
+    <span className="text-xs">R$</span><span className="text-right">{amount}</span>
+  </span>;
+}
 export function RevenueWorkspace({ mode = 'registration', detailContractId, asReceitas = false }: { mode?: 'registration' | 'annual' | 'history' | 'contracts'; detailContractId?: string; asReceitas?: boolean }) {
   const user = useRequireUser(); const qc = useQueryClient(); const today = todayBR();
-  const [year, setYear] = useState(today.slice(0, 4)); const [historyYear, setHistoryYear] = useState(''); const [source, setSource] = useState('');
+  const [year, setYear] = useState(today.slice(0, 4)); const [historyYear, setHistoryYear] = useState('');
+  const [historyMonth, setHistoryMonth] = useState(''); const [source, setSource] = useState('');
+  const [historyMenu, setHistoryMenu] = useState<'filter'|'settings'|null>(null);
   const [editing, setEditing] = useState<RevenueSource | null>(null);
   const [reajusteSource, setReajusteSource] = useState<RevenueSource | null>(null);
   const [reajusteMode, setReajusteMode] = useState<'percentage' | 'amount'>('percentage');
@@ -57,7 +66,8 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
   };
   const annualRows = [...new Map(annual.map(e => [revenueSourceKey(e), currentSource(e)])).values()];
   const sources = [...new Map(entries.filter(e => !e.contract_id).map(e => [revenueSourceKey(e), currentSource(e)])).values()].filter(e => e.title.toLowerCase().includes(search.toLowerCase()));
-  const history = receivedRevenue(entries, historyYear, source); const groups = [...new Set(history.map(e => e.due_date.slice(0, 7)))].sort().reverse();
+  const history = receivedRevenue(entries, historyYear, source).filter(e=>!historyMonth || e.due_date.slice(5,7)===historyMonth);
+  const groups = [...new Set(history.map(e => e.due_date.slice(0, 7)))].sort().reverse();
   const currentContract = contracts.find(c => c.id === contractId) ?? contracts[0];
   const installments = currentContract ? entries.filter(e => e.contract_id === currentContract.id) : [];
   const contractSummary = revenueSummary(installments, today); const receivedCount = installments.filter(e => e.received_date).length;
@@ -126,7 +136,7 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
   }
 
   async function copyReport() {
-    const lines = ['Histórico de Receitas — Axion', ''];
+    const lines = ['Histórico de Recebimentos — Órion', ''];
     for (const g of groups) {
       lines.push(monthLabel(g), ['Fonte Pagadora', 'Valor previsto', 'Vencimento', 'Recebimento', 'Valor recebido', 'Diferença', 'Observação'].join('\t'));
       for (const e of history.filter(entry => entry.due_date.startsWith(g))) {
@@ -146,15 +156,66 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
     setDocument(`CONTRATO — ${c.title}\nComprador: ${c.buyer}\nCPF: ${c.cpf} · RG: ${c.rg}\nContratado: ${formatBRL(c.total_cents)}\nRecebido: ${formatBRL(contractSummary.received)}\nEm aberto: ${formatBRL(contractSummary.pending)}\nJuros: ${c.interest_percent}% a.m.\n\nParcelas:\n${installments.map(e => `${String(e.number).padStart(3, '0')} — ${formatDateBR(e.due_date)} • Previsto ${formatBRL(e.expected_cents)} • Recebido ${formatBRL(e.received_cents)}`).join('\n')}\n\nAssinatura: __________________`);
   }
 
-  const title = mode === 'history' ? 'Histórico de Receitas' : mode === 'annual' ? (asReceitas ? 'Receitas' : 'Contas a receber') : mode === 'contracts' ? 'Contratos parcelados' : 'Receitas';
+  const title = mode === 'history' ? 'Histórico de Recebimentos' : mode === 'annual' ? (asReceitas ? 'Receitas' : 'Contas a receber') : mode === 'contracts' ? 'Contratos parcelados' : 'Receitas';
 
   return <AppShell active={mode === 'history' ? 'historico-receitas' : mode === 'annual' ? (asReceitas ? 'receitas' : 'contas-a-receber') : mode === 'contracts' ? 'crediario' : 'receitas'} user={user}><div className="p-6 lg:p-8">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-xs font-semibold uppercase text-muted-foreground">Controle financeiro</div><h1 className="text-3xl font-extrabold tracking-tight">{title}</h1></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="text-xs font-semibold uppercase text-muted-foreground">Controle financeiro</div><h1 className="text-3xl font-extrabold tracking-tight">{title}</h1>{mode==='history'&&<p className="text-sm text-muted-foreground">Recebimentos confirmados</p>}</div>
       <div className="no-print flex flex-wrap items-center gap-2">
         {mode === 'registration' && <><Button asChild variant="outline"><Link to="/contas-a-receber">Contas a receber <ArrowRight /></Link></Button><Button asChild variant="outline"><Link to="/crediario">Contratos parcelados</Link></Button><Button asChild variant="outline"><Link to="/historico-receitas">Histórico de receitas</Link></Button><Button variant="brand" onClick={() => setNewOpen(true)}><Plus />Nova receita</Button></>}
         {mode === 'annual' && <><Button asChild variant="outline"><Link to="/historico-receitas">Histórico de receitas</Link></Button><Button asChild variant="brand"><Link to="/crediario">Contratos parcelados <ArrowRight /></Link></Button></>}
         {mode === 'contracts' && <Button asChild variant="outline"><Link to="/contas-a-receber"><ArrowLeft />Contas a receber</Link></Button>}
-        {mode === 'history' && <><select aria-label="Ano do histórico" className="h-10 rounded-md border bg-card px-3 text-sm" value={historyYear} onChange={e => setHistoryYear(e.target.value)}><option value="">Todos os anos</option>{years.map(y => <option key={y} value={y}>{y}</option>)}</select><select aria-label="Fonte do histórico" className="h-10 max-w-full rounded-md border bg-card px-3 text-sm" value={source} onChange={e => setSource(e.target.value)}><option value="">Todas as fontes</option>{[...new Set(entries.filter(e => e.received_date).map(e => e.title))].sort().map(s => <option key={s} value={s}>{s}</option>)}</select><Button variant="outline" onClick={copyReport}><Copy />Copiar</Button><Button variant="outline" onClick={() => window.print()}><Printer />Imprimir / PDF</Button></>}
+        {mode === 'history' && <>
+          <div className="relative">
+            <Button variant="outline" aria-expanded={historyMenu==='filter'} aria-label="Abrir filtros"
+              onClick={()=>setHistoryMenu(historyMenu==='filter'?null:'filter')}>
+              <Filter className="size-4"/>Filtro {(historyYear||historyMonth||source)&&'•'}
+            </Button>
+            {historyMenu==='filter'&&<div className="absolute right-0 z-30 mt-2 w-72 space-y-3 rounded-xl border bg-card p-4 shadow-lg">
+              <div className="flex items-center justify-between">
+                <strong className="text-sm">Filtrar recebimentos</strong>
+                <button type="button" aria-label="Fechar filtros" onClick={()=>setHistoryMenu(null)}><X className="size-4"/></button>
+              </div>
+              <label className="block text-xs font-semibold text-muted-foreground">Ano
+                <select aria-label="Filtrar por ano" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground"
+                  value={historyYear} onChange={e=>setHistoryYear(e.target.value)}>
+                  <option value="">Todos os anos</option>{years.map(y=><option key={y} value={y}>{y}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-muted-foreground">Mês
+                <select aria-label="Filtrar por mês" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground"
+                  value={historyMonth} onChange={e=>setHistoryMonth(e.target.value)}>
+                  <option value="">Todos os meses</option>
+                  {Array.from({length:12},(_,i)=><option key={i} value={String(i+1).padStart(2,'0')}>
+                    {new Date(2026,i).toLocaleDateString('pt-BR',{month:'long'})}
+                  </option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-muted-foreground">Fonte pagadora
+                <select aria-label="Filtrar por fonte pagadora" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm text-foreground"
+                  value={source} onChange={e=>setSource(e.target.value)}>
+                  <option value="">Todas as fontes</option>
+                  {[...new Set(entries.filter(e=>e.received_date).map(e=>e.title))].sort().map(name=><option key={name} value={name}>{name}</option>)}
+                </select>
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={()=>{setHistoryYear('');setHistoryMonth('');setSource('');}}>Limpar</Button>
+                <Button size="sm" onClick={()=>setHistoryMenu(null)}>Aplicar</Button>
+              </div>
+            </div>}
+          </div>
+          <div className="relative">
+            <Button variant="outline" aria-expanded={historyMenu==='settings'} aria-label="Opções do histórico"
+              onClick={()=>setHistoryMenu(historyMenu==='settings'?null:'settings')}>
+              <Settings className="size-4"/>Opções
+            </Button>
+            {historyMenu==='settings'&&<div className="absolute right-0 z-30 mt-2 min-w-48 space-y-1 rounded-xl border bg-card p-2 shadow-lg">
+              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+                onClick={()=>{setHistoryMenu(null);void copyReport();}}><Copy className="size-4"/>Copiar</button>
+              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+                onClick={()=>{setHistoryMenu(null);window.print();}}><Printer className="size-4"/>Imprimir / PDF</button>
+            </div>}
+          </div>
+        </>}
       </div></div>
 
     {q.error && <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 bg-danger-soft p-4 text-sm text-destructive">{q.error.message}<Button variant="outline" onClick={() => q.refetch()}>Tentar novamente</Button></div>}
@@ -166,7 +227,67 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Summary label="Total geral previsto" value={formatBRL(annualSummary.expected)} /><Summary label="Valor recebido no ano" value={formatBRL(annualSummary.received)} tone="text-success" /><Summary label="A receber no ano" value={formatBRL(annualSummary.pending)} tone="text-destructive" /><Summary label="Fontes registradas" value={String(annualRows.length)} /><Summary label="Status do exercício" value="Em andamento" /></div>
         <div className="mt-6 overflow-x-auto rounded-lg border bg-card shadow-soft"><table className="w-full min-w-[900px] text-sm"><thead><tr className="bg-muted text-xs uppercase text-muted-foreground"><th className="sticky left-0 z-10 bg-muted px-3 py-2.5 text-left">Fonte Pagadora</th><th className="px-3 py-2.5 text-center">Jan</th>{MONTHS.slice(1).map(m => <th key={m} className="px-2 py-2.5 text-center">{m}</th>)}<th className="px-3 py-2.5 text-right">Total anual</th></tr></thead><tbody className="divide-y">{annualRows.length ? annualRows.map(row => { const list = annual.filter(e => revenueSourceKey(e) === revenueSourceKey(row)); return <tr key={revenueSourceKey(row)}><td className="sticky left-0 z-10 bg-card px-3 py-2 font-semibold"><div className="flex items-center justify-between gap-2"><span>{row.title}</span>{row.source_id && registeredSources.some(s => s.id === row.source_id && s.recurring) && !row.contract_id && <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary" aria-label={`Reajustar ${row.title}`} title="Reajustar fonte pagadora" onClick={() => openReajuste(row)}><Pencil className="h-3.5 w-3.5" /></Button>}</div></td>{MONTHS.map((m, i) => { const monthEntries = revenueMonthEntries(annual, row, `${year}-${String(i + 1).padStart(2, '0')}`); const paid = monthEntries.length > 0 && monthEntries.every(revenueSettled); return <td key={`${revenueSourceKey(row)}-${m}`} className={`px-2 py-2 text-center ${paid ? 'font-medium text-success' : ''}`}>{monthEntries.length ? <Button variant="ghost" className={`h-auto min-w-20 px-1 py-2 ${paid ? 'text-success' : ''}`} aria-label={`${row.title} — ${m} ${year}`} onClick={() => setCell({ title: `${row.title} — ${m} ${year}`, entries: monthEntries })}>{formatBRL(monthEntries.reduce((sum, e) => sum + e.expected_cents, 0))}</Button> : '—'}</td>; })}<td className="px-3 py-2 text-right font-bold">{formatBRL(list.reduce((sum, e) => sum + e.expected_cents, 0))}</td></tr>; }) : <tr><td colSpan={14} className="px-4 py-12 text-center text-muted-foreground">Nenhuma conta a receber neste exercício.</td></tr>}</tbody><tfoot><tr className="border-t-2 bg-muted/70 font-bold"><th scope="row" className="sticky left-0 z-10 bg-muted px-3 py-3 text-left">Total mensal</th>{MONTHS.map((m, i) => { const monthly = annual.filter(e => e.due_date.startsWith(`${year}-${String(i + 1).padStart(2, '0')}-`)); return <td key={m} className="px-2 py-3 text-center whitespace-nowrap">{monthly.length ? formatBRL(monthly.reduce((sum, e) => sum + e.expected_cents, 0)) : '—'}</td>; })}<td className="px-3 py-3 text-right whitespace-nowrap">{formatBRL(annualSummary.expected)}</td></tr></tfoot></table></div><Button className="mt-4" variant="outline" onClick={() => setNewOpen(true)}><Plus />Nova fonte de renda</Button></>}
 
-      {mode === 'history' && <>{!history.length && <p className="mt-10 text-center text-muted-foreground">Nenhum recebimento confirmado encontrado.</p>}{groups.map(g => { const list = history.filter(e => e.due_date.startsWith(g)); return <section key={g} className="mt-6 border-t pt-4"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-bold">{monthLabel(g)}</h2><span className="text-sm text-success">{list.length} recebimentos • {formatBRL(list.reduce((sum, e) => sum + (e.received_cents ?? 0), 0))}</span></div><RevenueTable entries={list} onReceive={setSelected} onFiles={fileButton} /></section>; })}{events.some(e => e.kind === 'correção') && <section className="mt-6 border-t pt-5"><h2 className="text-lg font-bold">Registro de alterações</h2><div className="mt-3 divide-y text-sm">{events.filter(e => e.kind === 'correção').map(e => <div key={e.id} className="py-3"><strong>{entries.find(r => r.id === e.entry_id)?.title}</strong><span className="ml-2 text-muted-foreground">{new Date(e.created_at).toLocaleString('pt-BR')}</span><p className="mt-1">{e.reason}</p></div>)}</div></section>}</>}
+      {mode === 'history' && <>
+        {!history.length&&<p className="mt-10 text-center text-muted-foreground">Nenhum recebimento confirmado encontrado.</p>}
+        {groups.map(g=>{
+          const list=history.filter(e=>e.due_date.startsWith(g));
+          const totalReceived=list.reduce((sum,e)=>sum+(e.received_cents??0),0);
+          return <section key={g} className="mt-6 rounded-2xl border bg-card shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4">
+              <h2 className="text-lg font-bold">{monthLabel(g)}</h2>
+              <span className="text-base font-bold text-success tabular-nums">{list.length} recebimentos · {formatBRL(totalReceived)}</span>
+            </div>
+            <div className="overflow-x-auto p-5 pt-3">
+              <table className="w-full min-w-[1280px] table-fixed text-sm">
+                <colgroup>
+                  <col style={{width:'18%'}}/><col style={{width:'12%'}}/><col style={{width:'10%'}}/>
+                  <col style={{width:'10%'}}/><col style={{width:'12%'}}/><col style={{width:'11%'}}/>
+                  <col style={{width:'12%'}}/><col style={{width:'9%'}}/><col style={{width:'6%'}}/>
+                </colgroup>
+                <thead><tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="rounded-l-lg px-3 py-2 text-left">Fonte pagadora</th>
+                  <th className="px-3 py-2 text-right">Valor previsto</th>
+                  <th className="px-3 py-2">Vencimento</th><th className="px-3 py-2">Recebimento</th>
+                  <th className="px-3 py-2 text-right">Valor recebido</th>
+                  <th className="px-3 py-2">Diferença</th>
+                  <th className="px-3 py-2 text-left">Observação</th>
+                  <th className="whitespace-nowrap px-1 py-2 text-center text-[11px]">Comprovante</th>
+                  <th className="no-print whitespace-nowrap rounded-r-lg px-1 py-2 text-center text-[11px]">Ajuste</th>
+                </tr></thead>
+                <tbody className="divide-y">{list.map(e=><tr key={e.id}>
+                  <td className="px-3 py-2"><div className="font-semibold">{e.title}</div>{e.contract_id&&<div className="text-xs text-muted-foreground">Parcela {e.number}</div>}</td>
+                  <td className="px-2 py-2 text-right"><RevenueAccountingMoney cents={e.expected_cents}/></td>
+                  <td className="px-3 py-2 text-center">{formatDateBR(e.due_date)}</td>
+                  <td className="px-3 py-2 text-center">{formatDateBR(e.received_date)}</td>
+                  <td className="px-2 py-2 text-right"><RevenueAccountingMoney cents={e.received_cents??0} received/></td>
+                  <td className="px-3 py-2 text-center text-xs">{diffLabel(e.expected_cents,e.received_cents)}</td>
+                  <td className="break-words px-3 py-2 text-xs">{e.note?.trim()
+                    ? e.note : formatDateBR(e.received_date)===formatDateBR(e.due_date)
+                      ? 'Recebido no vencimento'
+                      : `Recebido em ${formatDateBR(e.received_date)}`}</td>
+                  <td className="px-3 py-2"><div className="flex justify-center">
+                    <Button variant="ghost" size="icon" aria-label={`Comprovantes de ${e.title}`} title="Comprovante"
+                      onClick={()=>fileButton(e)}><Paperclip className="size-4"/></Button>
+                  </div></td>
+                  <td className="no-print px-3 py-2"><div className="flex justify-center">
+                    <button type="button" aria-label={`Corrigir recebimento de ${e.title}`} title="Corrigir recebimento"
+                      className="grid size-8 place-items-center rounded-lg border bg-card text-muted-foreground hover:bg-accent"
+                      onClick={()=>setSelected(e)}><Pencil className="size-4"/></button>
+                  </div></td>
+                </tr>)}</tbody>
+              </table>
+            </div>
+          </section>;
+        })}
+        {events.some(e=>e.kind==='correção')&&<section className="mt-6 border-t pt-5">
+          <h2 className="text-lg font-bold">Registro de alterações</h2>
+          <div className="mt-3 divide-y text-sm">{events.filter(e=>e.kind==='correção').map(e=><div key={e.id} className="py-3">
+            <strong>{entries.find(r=>r.id===e.entry_id)?.title}</strong>
+            <span className="ml-2 text-muted-foreground">{new Date(e.created_at).toLocaleString('pt-BR')}</span>
+            <p className="mt-1">{e.reason}</p>
+          </div>)}</div>
+        </section>}
+      </>}
 
       {mode === 'contracts' && <ContractWorkspace contracts={contracts} entries={entries} contractId={detailContractId} onNew={()=>setNewOpen(true)} onReceive={setSelected} onFiles={fileButton} onSaved={saved} />}
     </>}
