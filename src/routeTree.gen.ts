@@ -33,6 +33,7 @@ import { Route as PainelRouteImport } from './routes/painel'
 import { Route as PerfilRouteImport } from './routes/perfil'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 import { Route as RelogioRouteImport } from './routes/relogio'
+import { Route as VeiculosRouteImport } from './routes/veiculos'
 import { Route as ViagensRouteImport } from './routes/viagens'
 import { Route as ConfiguracoesOpenFinanceRouteImport } from './routes/configuracoes.open-finance'
 import { Route as ContratosReceitasContractIdRouteImport } from './routes/contratos-receitas.$contractId'
@@ -161,6 +162,11 @@ const RelogioRoute = RelogioRouteImport.update({
   path: '/relogio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VeiculosRoute = VeiculosRouteImport.update({
+  id: '/veiculos',
+  path: '/veiculos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ViagensRoute = ViagensRouteImport.update({
   id: '/viagens',
   path: '/viagens',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/perfil': typeof PerfilRoute
   '/receitas': typeof ReceitasRoute
   '/relogio': typeof RelogioRoute
+  '/veiculos': typeof VeiculosRoute
   '/viagens': typeof ViagensRoute
   '/configuracoes/open-finance': typeof ConfiguracoesOpenFinanceRoute
   '/contratos-receitas/$contractId': typeof ContratosReceitasContractIdRoute
@@ -257,6 +264,7 @@ export interface FileRoutesByTo {
   '/perfil': typeof PerfilRoute
   '/receitas': typeof ReceitasRoute
   '/relogio': typeof RelogioRoute
+  '/veiculos': typeof VeiculosRoute
   '/viagens': typeof ViagensRoute
   '/configuracoes/open-finance': typeof ConfiguracoesOpenFinanceRoute
   '/contratos-receitas/$contractId': typeof ContratosReceitasContractIdRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/perfil': typeof PerfilRoute
   '/receitas': typeof ReceitasRoute
   '/relogio': typeof RelogioRoute
+  '/veiculos': typeof VeiculosRoute
   '/viagens': typeof ViagensRoute
   '/configuracoes/open-finance': typeof ConfiguracoesOpenFinanceRoute
   '/contratos-receitas/$contractId': typeof ContratosReceitasContractIdRoute
@@ -326,6 +335,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/receitas'
     | '/relogio'
+    | '/veiculos'
     | '/viagens'
     | '/configuracoes/open-finance'
     | '/contratos-receitas/$contractId'
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/receitas'
     | '/relogio'
+    | '/veiculos'
     | '/viagens'
     | '/configuracoes/open-finance'
     | '/contratos-receitas/$contractId'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/perfil'
     | '/receitas'
     | '/relogio'
+    | '/veiculos'
     | '/viagens'
     | '/configuracoes/open-finance'
     | '/contratos-receitas/$contractId'
@@ -426,6 +438,7 @@ export interface RootRouteChildren {
   PerfilRoute: typeof PerfilRoute
   ReceitasRoute: typeof ReceitasRoute
   RelogioRoute: typeof RelogioRoute
+  VeiculosRoute: typeof VeiculosRoute
   ViagensRoute: typeof ViagensRoute
   ConfiguracoesOpenFinanceRoute: typeof ConfiguracoesOpenFinanceRoute
   ContratosReceitasContractIdRoute: typeof ContratosReceitasContractIdRoute
@@ -603,6 +616,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RelogioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/veiculos': {
+      id: '/veiculos'
+      path: '/veiculos'
+      fullPath: '/veiculos'
+      preLoaderRoute: typeof VeiculosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/viagens': {
       id: '/viagens'
       path: '/viagens'
@@ -694,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   PerfilRoute: PerfilRoute,
   ReceitasRoute: ReceitasRoute,
   RelogioRoute: RelogioRoute,
+  VeiculosRoute: VeiculosRoute,
   ViagensRoute: ViagensRoute,
   ConfiguracoesOpenFinanceRoute: ConfiguracoesOpenFinanceRoute,
   ContratosReceitasContractIdRoute: ContratosReceitasContractIdRoute,
