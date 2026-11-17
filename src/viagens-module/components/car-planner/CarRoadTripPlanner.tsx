@@ -66,15 +66,17 @@ interface CarRoadTripPlannerProps {
   onBackToTickets?: () => void;
   initialOriginCity?: string;
   initialDestCity?: string;
+  googleMapsApiKey?: string;
 }
 
 export function CarRoadTripPlanner({
   onBackToTickets,
   initialOriginCity = 'São Paulo',
-  initialDestCity = 'Rio de Janeiro'
+  initialDestCity = 'Rio de Janeiro',
+  googleMapsApiKey: personalGoogleMapsApiKey
 }: CarRoadTripPlannerProps) {
-  // Read Maps API key from environment
-  const googleMapsApiKey = (import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] as string) || '';
+  // A chave configurada no módulo tem prioridade; a chave do projeto segue como fallback.
+  const googleMapsApiKey = personalGoogleMapsApiKey || (import.meta.env['VITE_GOOGLE_MAPS_API_KEY'] as string) || '';
 
   // Preset Brazilian Route Shortcuts
   const PRESET_ROUTES = [
@@ -1365,7 +1367,7 @@ export function CarRoadTripPlanner({
 
   if (googleMapsApiKey) {
     return (
-      <APIProvider apiKey={googleMapsApiKey} language="pt-BR" region="BR">
+      <APIProvider key={googleMapsApiKey} apiKey={googleMapsApiKey} language="pt-BR" region="BR">
         {plannerContent}
       </APIProvider>
     );
