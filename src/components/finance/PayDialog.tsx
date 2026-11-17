@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Paperclip, X } from "lucide-react";
@@ -25,6 +26,7 @@ export type PayTarget = {
 );
 
 export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | null; onClose: () => void; onSaved: () => void }) {
+  const client = useQueryClient();
   const payBill = useServerFn(payBillFn);
   const reviseBill = useServerFn(reviseBillFn);
   const payInst = useServerFn(payInstallmentFn);
@@ -95,11 +97,13 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
         await upload({ data: { entityType, entityId, fileName: f.name, mimeType: f.type, sizeBytes: f.size, dataBase64 } });
       }
       toast.success(isRevision ? "Pagamento corrigido com auditoria." : "Pagamento registrado.");
+      void client.invalidateQueries();
       onSaved();
       onClose();
     } catch (e) {
       if (paymentSaved) {
         toast.warning("Pagamento registrado, mas não foi possível anexar todos os comprovantes. Abra o ícone de comprovantes para tentar novamente.", { description: (e as Error).message });
+        void client.invalidateQueries();
         onSaved();
         onClose();
       } else {
