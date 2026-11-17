@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("@tanstack/react-start",()=>({createServerFn:()=>{const b={middleware:()=>b,inputValidator:()=>b,handler:(fn:unknown)=>fn};return b;}}));
 vi.mock("@/integrations/supabase/auth-middleware",()=>({requireSupabaseAuth:{}}));
-vi.mock("@/lib/pluggy.functions",()=>({assertUserFinanceAccount:vi.fn(async()=>"CREDIT")}));
+vi.mock("@/lib/pluggy.functions",()=>({assertUserFinanceAccount:vi.fn(async()=>"CREDIT"),authorizedMovementAccount:vi.fn(async()=>({id:"bank",name:"Conta corrente",type:"BANK"}))}));
 import { getLauncherState, saveLaunch, recordAccountSettlement } from "@/lib/finance/launcher.functions";
-import { assertUserFinanceAccount } from "@/lib/pluggy.functions";
+import { assertUserFinanceAccount, authorizedMovementAccount } from "@/lib/pluggy.functions";
 import type { Launch } from "@/lib/finance/launcher";
-const call=(fn:unknown,data:unknown,rpc:any)=>(fn as (args:any)=>Promise<any>)({data,context:{supabase:{rpc},userId:"owner"}});
+const call=(fn:unknown,data:unknown,rpc:any)=>(fn as (args:any)=>Promise<any>)({data,context:{supabase:{rpc,from:()=>{const q:any={select:()=>q,eq:()=>q,not:()=>q,order:()=>q,limit:()=>q,then:(resolve:any)=>Promise.resolve({data:[],error:null}).then(resolve)};return q;}},userId:"owner"}});
 const launch:Launch={requestId:"c46061e2-e4e3-48d0-8760-d55157c2d37b",kind:"expense",title:"Compra",date:"2026-11-17",totalCents:100000,medium:"card",accountId:"card",destinationAccountId:null,creditorId:null,installments:10,startingInstallment:1,firstDue:"2026-12-10",receivedCents:null,source:"",note:"",alreadySettled:false,baselineIncludesFirst:false};
 describe("ativação e gravação protegidas",()=>{
  it("habilita só a prévia quando a função do banco não existe",async()=>{
@@ -28,10 +28,10 @@ describe("ativação e gravação protegidas",()=>{
  });
  it("não tenta gravações alternativas se o backend está ausente",async()=>{
    const rpc=vi.fn(async()=>({data:null,error:{code:"PGRST202",message:"Could not find finance_launch_transaction"}}));
-   await expect(call(saveLaunch,launch,rpc)).rejects.toThrow("Modo de análise");expect(rpc).toHaveBeenCalledTimes(1);
+   await expect(call(saveLaunch,launch,rpc)).rejects.toThrow(/modo de análise/i);expect(rpc).toHaveBeenCalledTimes(1);
  });
  it("recusa usar cartão como conta de origem de pagamento bancário",async()=>{
-   vi.mocked(assertUserFinanceAccount).mockResolvedValueOnce("CREDIT");const rpc=vi.fn();
+   vi.mocked(authorizedMovementAccount).mockResolvedValueOnce({id:"card",name:"Cartão",type:"CREDIT"});const rpc=vi.fn();
    await expect(call(recordAccountSettlement,{accountId:"card"},rpc)).rejects.toThrow("Selecione uma conta bancária");expect(rpc).not.toHaveBeenCalled();
  });
 });

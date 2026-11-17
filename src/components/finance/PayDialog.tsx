@@ -1,3 +1,4 @@
+import { unpackMovementNote } from "@/lib/finance/account-movement";
 import { SettlementAccountField, useSettlementAccount } from "./launcher/SettlementAccount";
 import { recordAccountSettlement } from "@/lib/finance/launcher.functions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -54,10 +55,10 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
     if (target) {
       setDate(target.paid_date ?? new Date().toISOString().slice(0, 10));
       setValue(((target.paid_cents ?? target.expected_cents) / 100).toFixed(2).replace(".", ","));
-      setNote(target.note ?? "");
-      setQuits(Boolean(target.is_settled));
+      setNote(unpackMovementNote(target.note).note);
+      setQuits(target.paid_date ? Boolean(target.is_settled) : true);
       setFiles([]);
-      account.setAccountId("");
+      account.setAccountId(unpackMovementNote(target.note).movement?.accountId??"");
       setRequestId(crypto.randomUUID());
     }
   }, [target]);
@@ -89,7 +90,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
     setSaving(true);
     let paymentSaved = false;
     try {
-      if(account.available){
+      if(account.accountId){
         await recordSettlement({data:{requestId,kind:target.kind,id:target.kind==="bill"?target.id:target.contractId,
           number:target.kind==="installment"?target.number:null,accountId:account.accountId,date,cents,note,
           reason:isRevision?"Correção de pagamento":"",quits,revision:isRevision}});
@@ -109,7 +110,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
         const dataBase64 = await fileToBase64(f);
         await upload({ data: { entityType, entityId, fileName: f.name, mimeType: f.type, sizeBytes: f.size, dataBase64 } });
       }
-      toast.success(isRevision ? "Pagamento corrigido com auditoria." : "Pagamento registrado.");
+      toast.success(isRevision ? "Pagamento corrigido com auditoria." : account.accountId ? "Pagamento e saída da conta registrados." : "Pagamento registrado.");
       void client.invalidateQueries();
       onSaved();
       onClose();
@@ -150,7 +151,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
                   <div className="mt-1 text-lg font-extrabold tracking-tight text-foreground">{formatBRL(target.expected_cents)}</div>
                 </div>
               </div>
-              <SettlementAccountField flow="payment" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error}/>
+              <SettlementAccountField flow="payment" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error} amountCents={centsPreview}/>
               <div className="space-y-2">
                 <Label htmlFor="pay-date">Data do pagamento</Label>
                 <Input id="pay-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

@@ -1,3 +1,4 @@
+import { AccountMovementSummary } from "@/components/finance/launcher/AccountMovementSummary";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -237,6 +238,7 @@ function Painel() {
                 <CardWallet cards={cards} displayName={titleFor} displayBrand={brandFor} onEdit={edit} onOpen={setStatementAcc} />
               </Panel>
 
+              <Panel title="Entradas e saídas registradas"><AccountMovementSummary ownerKey={user?.email??""} transactions={txs}/></Panel>
               <Panel title="Últimas movimentações" action={<button type="button" onClick={() => setHistoryOpen(true)}
                 aria-label="Abrir histórico consolidado de movimentações" title="Histórico consolidado" className="grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"><Save className="size-4"/></button>}>
                 <p className="mb-3 text-xs text-muted-foreground">Movimentações de todas as contas e cartões, sem parcelas.</p>

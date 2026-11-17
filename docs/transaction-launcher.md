@@ -39,3 +39,11 @@ Documentos neste lote: campo de referência/observação da nota. Upload e vínc
 6. Mesmos valor e data em duas contas: sugerir somente a conta escolhida. Duas correspondências na mesma conta exigem escolha. Evento já conciliado não pode ser reutilizado.
 7. Negar acesso cruzado entre usuários; cliente adulterando p_plan/cents/accountId deve ser recusado pelo banco.
 8. Após ativar backend, testar importação de fatura fechada real, divergência, parcela parcial, anexo, correção para valor menor e concorrência entre abas. Não afirmar conciliação concluída com base apenas nos testes simulados.
+
+## Atualização: fontes pagadoras e registros existentes
+
+A operação visível passa a ter somente Receita/Despesa. Em Receita, a fonte Cartão de crédito abre Pix Cartão Parcelado, com nome fixo e valor líquido em destaque. Condições da dívida permanecem separadas. Contratos parcelados abre ContractForm, sem duplicar seu cadastro. Fonte cadastrada pergunta entre baixa de recebimento existente (ReceiveDialog, ID do compromisso) e nova renda da mesma fonte (sourceId validado no servidor). O backend de novas rendas deve conservar sourceId em vez de criar outra fonte com o mesmo nome.
+
+Pagamentos/recebimentos existentes deixam de depender da ativação do lançador. A conta bancária é validada via conexão do usuário. Caso finance_record_settlement ainda não exista, a baixa canônica existente guarda a conta e a direção em um envelope versionado da observação, dentro da MESMA transação de pagamento/recebimento/auditoria. O texto da observação fica separado na edição; históricos e impressões apresentam o nome da conta legível. Correções usam o mesmo compromisso. Não há criação de segunda obrigação nem alteração de esquema.
+
+O estado do lançador e o quadro de contas na Carteira conseguem exibir até 100 registros recentes derivados das baixas com esse envelope. Espelhos da mesma parcela são substituídos pela parcela canônica. Entradas/saídas exibidas são totais desses registros e NÃO são somadas aos movimentos do provedor nem subtraídas novamente do saldo bancário. Possíveis correspondências com o Pluggy são apenas sugestões. Reconciliação persistente e classificação de eventos antigos sem conta ainda dependem da estrutura nova. Ao ativar o novo backend, migrar/ler esse envelope e preservar os IDs das entidades para evitar duplicar o histórico existente.

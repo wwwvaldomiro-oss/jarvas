@@ -12,6 +12,7 @@ export const launchSchema = z.object({
   medium: z.enum(["bank", "card", "creditor"]),
   accountId: id.nullable(), destinationAccountId: id.nullable(),
   creditorId: z.string().uuid().nullable(),
+  sourceId: z.string().uuid().nullable().optional(),
   installments: z.number().int().min(1).max(120),
   startingInstallment: z.number().int().min(1).max(120),
   firstDue: date,
@@ -22,6 +23,7 @@ export const launchSchema = z.object({
   baselineIncludesFirst: z.boolean(),
 }).superRefine((v, ctx) => {
   const fail = (path: keyof typeof v, message: string) => ctx.addIssue({code: "custom", path: [path], message});
+  if(v.sourceId && v.kind!=="income")fail("sourceId","A fonte cadastrada só se aplica a receitas.");
   if (v.startingInstallment > v.installments) fail("startingInstallment", "A parcela inicial excede o total de parcelas.");
   if (v.totalCents < v.installments) fail("totalCents", "O valor deve permitir ao menos um centavo por parcela.");
   if ((v.medium === "card" || v.medium === "bank") && !v.accountId) fail("accountId", "Selecione a conta ou o cartão.");

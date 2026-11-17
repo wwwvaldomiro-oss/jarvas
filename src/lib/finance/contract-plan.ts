@@ -1,3 +1,4 @@
+import { visibleMovementNote } from "./account-movement";
 import { z } from 'zod';
 import type { RevenueEntry } from './revenue';
 export const CONTRACT_STATUSES = ['Atrasado','Concluído','Em andamento','Pausado','Perdoado','Ajuizado','Renegociado'] as const;
@@ -20,8 +21,8 @@ export function contractStatus(status:string, entries:RevenueEntry[], today:stri
   return status;
 }
 export function installmentNote(e:RevenueEntry) {
-  if(!e.received_date)return e.note||'';
+  if(!e.received_date)return visibleMovementNote(e.note);
   const charge=Math.max(0,amountDue(e)-e.expected_cents);
-  return `${e.received_date>e.due_date?'Pago com atraso':e.received_date<e.due_date?'Pago antecipadamente':'Pago em dia'}${charge?` · Correção cobrada: ${(charge/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`:''}${e.note?` · ${e.note}`:''}`;
+  return `${e.received_date>e.due_date?'Pago com atraso':e.received_date<e.due_date?'Pago antecipadamente':'Pago em dia'}${charge?` · Correção cobrada: ${(charge/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`:''}${visibleMovementNote(e.note)?` · ${visibleMovementNote(e.note)}`:''}`;
 }
 export const contactSchema=z.object({address:z.string().trim().max(300),postal_code:z.string().max(9).refine(v=>!v||/^\d{5}-?\d{3}$/.test(v),'CEP inválido'),city:z.string().trim().max(100),state:z.string().max(2).refine(v=>!v||/^(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)$/.test(v),'Estado inválido'),phone:z.string().max(25),email:z.string().max(254).refine(v=>!v||z.string().email().safeParse(v).success,'E-mail inválido'),note:z.string().max(2000)});
