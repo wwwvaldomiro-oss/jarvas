@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import React, { useState } from 'react';
 import { Check, Copy, Download, RotateCcw, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -62,7 +63,7 @@ export const ExportIntegrationDrawer: React.FC<ExportIntegrationDrawerProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/60 backdrop-blur-[1px]">
+    <ViewportOverlay className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/60 backdrop-blur-[1px]">
       <div
         role="dialog"
         aria-modal="true"
@@ -180,6 +181,6 @@ export const ExportIntegrationDrawer: React.FC<ExportIntegrationDrawerProps> = (
           </section>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 };

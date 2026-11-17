@@ -1,3 +1,4 @@
+import { confirmAction, promptValue } from '@/lib/popup';
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -127,7 +128,7 @@ function Chat({ access, email, onConfigured, initial }: ConfiguredProps & { init
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy || !ready || !question.trim()) return;
-    if (isPaid && !window.confirm("Este modo usa OpenAI e pode gerar cobrança. Continuar?")) return;
+    if (isPaid && !(await confirmAction("Este modo usa OpenAI e pode gerar cobrança. Continuar?"))) return;
     const c = conversation ?? fresh();
     if (edit !== null && c.branches.length >= 12) { setError("Limite de versões. Exporte e comece outra conversa."); return; }
     const prior = edit === null ? messages : messages.slice(0, edit);
@@ -154,12 +155,12 @@ function Chat({ access, email, onConfigured, initial }: ConfiguredProps & { init
     const a = document.createElement("a"); a.href = url; a.download = "axion-conversa.json"; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
-  function dictate() {
+  async function dictate() {
     if (dictation) { dictation.stop(); return; }
     const browser = window as typeof window & { SpeechRecognition?: new () => Dictation; webkitSpeechRecognition?: new () => Dictation };
     const Recognition = browser.SpeechRecognition ?? browser.webkitSpeechRecognition;
     if (!Recognition) { setError("Este navegador não oferece ditado. Use o microfone do teclado ou digite."); return; }
-    if (!window.confirm("O navegador pode enviar o áudio ao serviço de reconhecimento de voz. Continuar?")) return;
+    if (!(await confirmAction("O navegador pode enviar o áudio ao serviço de reconhecimento de voz. Continuar?"))) return;
     const mic = new Recognition();
     mic.lang = "pt-BR";
     mic.onresult = e => setQuestion(old => (old + " " + (e.results[0]?.[0]?.transcript ?? "")).trim().slice(0, 4000));
@@ -267,13 +268,13 @@ function Chat({ access, email, onConfigured, initial }: ConfiguredProps & { init
         </Button>)}
       {conversation && <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={busy} onClick={exportConversation}>Exportar</Button>
-        <Button variant="outline" disabled={busy || conversation.revision === null} onClick={() => {
-          const title = window.prompt("Novo título", conversation.title)?.trim();
+        <Button variant="outline" disabled={busy || conversation.revision === null} onClick={async () => {
+          const title = (await promptValue("Novo título", conversation.title))?.trim();
           if (title) void action(() => persist({ ...conversation, title: title.slice(0, 120) }));
         }}>Renomear</Button>
         <Button variant="outline" disabled={busy || conversation.revision === null} onClick={() => void action(() => persist({ ...conversation, archived: !conversation.archived }))}>{conversation.archived ? "Desarquivar" : "Arquivar"}</Button>
-        <Button variant="destructive" disabled={busy || conversation.revision === null} onClick={() => {
-          if (conversation.revision !== null && window.confirm("Excluir a conversa e todas as suas versões?")) {
+        <Button variant="destructive" disabled={busy || conversation.revision === null} onClick={async () => {
+          if (conversation.revision !== null && (await confirmAction("Excluir a conversa e todas as suas versões?"))) {
             const { id, revision } = conversation;
             void action(async () => { await remove({ data: { id, revision } }); reset(null); await history.refetch(); });
           }

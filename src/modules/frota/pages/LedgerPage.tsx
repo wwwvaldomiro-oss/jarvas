@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -797,7 +798,7 @@ export const LedgerPage: React.FC<LedgerPageProps> = ({ onOpenQuickEntry }) => {
 
       {/* Drawer de Conciliação Open Finance (Pluggy) */}
       {reconcileOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/60 backdrop-blur-[1px]">
+        <ViewportOverlay className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/60 backdrop-blur-[1px]">
           <div className="w-full max-w-lg bg-white h-full border-l border-[#E7E1D5] shadow-2xl flex flex-col">
             <div className="px-6 py-4 border-b border-[#E7E1D5] flex items-center justify-between">
               <div>
@@ -817,7 +818,7 @@ export const LedgerPage: React.FC<LedgerPageProps> = ({ onOpenQuickEntry }) => {
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            <div className="p-6 space-y-4 min-h-0 overflow-y-auto flex-1">
               {SAMPLE_OPEN_FINANCE_FEED.map((tx) => {
                 const isDone = reconciledIds.includes(tx.id);
                 const defaultVeh =
@@ -872,7 +873,7 @@ export const LedgerPage: React.FC<LedgerPageProps> = ({ onOpenQuickEntry }) => {
               })}
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import { useState } from 'react';
 import { X, Copy, Check, MessageSquare, Share2, Send, QrCode } from 'lucide-react';
 import { CalculatedRouteResult, generateDriverShareText } from '../../services/tollEngine';
@@ -26,7 +27,7 @@ export function ShareDriverModal({ route, isOpen, onClose }: ShareDriverModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <ViewportOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
       <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -84,6 +85,6 @@ export function ShareDriverModal({ route, isOpen, onClose }: ShareDriverModalPro
           </button>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 }

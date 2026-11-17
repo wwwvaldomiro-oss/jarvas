@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import { X, Printer, Download, FileSpreadsheet, FileText, CheckCircle2 } from 'lucide-react';
 import { CalculatedRouteResult } from '../../services/tollEngine';
 import { VEHICLE_CATEGORIES, FUEL_OPTIONS } from '../../data/tollPlazasData';
@@ -46,8 +47,8 @@ export function ExportReportModal({ route, isOpen, onClose }: ExportReportModalP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col">
+    <ViewportOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[calc(100dvh-2rem)] flex flex-col">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center">
@@ -126,6 +127,6 @@ export function ExportReportModal({ route, isOpen, onClose }: ExportReportModalP
           </button>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 }

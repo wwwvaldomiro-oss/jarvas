@@ -1,3 +1,4 @@
+import { confirmAction } from '@/lib/popup';
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell, useRequireUser } from "@/components/AppShell";
@@ -34,8 +35,8 @@ function Page() {
     persist([{ id: crypto.randomUUID(), first: first.trim(), second: second.trim(), done: false, createdAt: new Date().toISOString() }, ...items]);
     setFirst(""); setSecond("");
   }
-  function remove(id: string) {
-    if (window.confirm("Excluir este registro?")) persist(items.filter(item => item.id !== id));
+  async function remove(id: string) {
+    if ((await confirmAction("Excluir este registro?"))) persist(items.filter(item => item.id !== id));
   }
   return <AppShell active="notas" user={user}>
     <div className="mx-auto max-w-5xl p-6 lg:p-8">

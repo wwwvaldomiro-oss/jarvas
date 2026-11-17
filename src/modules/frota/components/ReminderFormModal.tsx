@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useFleet } from '../context/FleetContext';
@@ -61,7 +62,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({ open, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0C1928]/60 backdrop-blur-[1px]">
+    <ViewportOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0C1928]/60 backdrop-blur-[1px]">
       <div
         role="dialog"
         aria-modal="true"
@@ -185,6 +186,6 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({ open, onCl
           </div>
         </form>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 };

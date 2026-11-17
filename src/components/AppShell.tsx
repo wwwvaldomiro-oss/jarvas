@@ -142,6 +142,23 @@ const DESPESAS_SUB = [
   { to: "/historico-pagamentos", id: "historico", label: "Histórico de Pagamentos", icon: History },
 ] as const;
 
+function SidebarAccount({user,onNavigate}: {user:AppUser | null;onNavigate?: (()=>void) | undefined}) {
+  return <div className="mt-4 shrink-0 space-y-3 border-t border-white/15 pt-4">
+            <details className="no-print">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-white/10 px-3 py-2.5 text-xs font-semibold text-white/90 transition-colors hover:border-primary/20 hover:bg-accent/50" aria-label="Outros recursos do Órion"><Settings2 className="size-4" /><span>Outros recursos</span></summary>
+              <div className="mt-2 flex max-h-[35dvh] w-full flex-col gap-1 overflow-y-auto rounded-2xl border bg-card p-2 shadow-soft">
+                <Link to="/notas" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Anotações</Link>
+                <Link to="/nuvem" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Nuvem</Link>
+                <Link to="/perfil" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Perfil</Link>
+                <Link to="/configuracoes/open-finance" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Configurações · Open Finance</Link>
+                <Link to="/auditoria" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Auditoria</Link>
+              </div>
+            </details>
+
+    <div className="min-w-0 px-3 text-sm text-white"><div className="break-words font-semibold">{user?.name}</div><div className="break-all text-xs text-white/70">{user?.email}</div></div>
+  </div>;
+}
+
 export function AppShell({
   active,
   user,
@@ -188,6 +205,7 @@ export function AppShell({
         <nav aria-label="Menu principal" className="mt-8 min-h-0 flex-1 space-y-1 overflow-y-auto pr-1">
           {nav(false)}
         </nav>
+        <SidebarAccount user={user} />
         <Button
           variant="ghost"
           onClick={signOut}
@@ -199,7 +217,7 @@ export function AppShell({
       </aside>
 
       <main className="min-w-0 flex-1 overflow-x-hidden">
-        <header className="axion-topbar no-print sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:justify-end md:px-6">
+        <header className={`axion-topbar no-print ${headerActions ? "flex" : "flex md:hidden"} sticky top-0 z-20 flex-wrap items-center justify-between gap-3 px-4 py-3 md:justify-end md:px-6`}>
           <div className="flex min-w-0 items-center gap-2 md:hidden">
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
               <SheetTrigger asChild>
@@ -217,6 +235,7 @@ export function AppShell({
                 <nav aria-label="Menu principal" className="mt-6 space-y-1.5 axion-mobile-menu">
                   {nav(false, () => setMenuOpen(false))}
                 </nav>
+                <SidebarAccount user={user} onNavigate={() => setMenuOpen(false)} />
                 <Button variant="ghost" onClick={signOut} className="axion-sidebar-signout mt-auto justify-start gap-3">
                   <LogOut />
                   Sair
@@ -228,20 +247,7 @@ export function AppShell({
 
           <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
             {headerActions}
-            <details className="relative no-print">
-              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-border bg-white px-3 py-2.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/20 hover:bg-accent/50" aria-label="Outros recursos do Órion"><Settings2 className="size-4" /><span className="hidden lg:inline">Outros recursos</span></summary>
-              <div className="absolute right-0 z-50 mt-2 flex w-56 flex-col gap-1 rounded-2xl border bg-card p-2 shadow-soft">
-                <Link to="/notas" className="rounded-md p-2 text-sm hover:bg-accent">Anotações</Link>
-                <Link to="/nuvem" className="rounded-md p-2 text-sm hover:bg-accent">Nuvem</Link>
-                <Link to="/perfil" className="rounded-md p-2 text-sm hover:bg-accent">Perfil</Link>
-                <Link to="/configuracoes/open-finance" className="rounded-md p-2 text-sm hover:bg-accent">Configurações · Open Finance</Link>
-                <Link to="/auditoria" className="rounded-md p-2 text-sm hover:bg-accent">Auditoria</Link>
-              </div>
-            </details>
-            <div className="hidden min-w-0 text-right text-sm md:block">
-              <div className="break-words font-semibold text-foreground">{user?.name}</div>
-              <div className="break-words text-xs text-muted-foreground">{user?.email}</div>
-            </div>
+
           </div>
         </header>
         <div className="axion-page-content pb-20 md:pb-0">{children}</div>
