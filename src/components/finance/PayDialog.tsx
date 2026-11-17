@@ -1,3 +1,5 @@
+import { SettlementAccountField, useSettlementAccount } from "./launcher/SettlementAccount";
+import { recordAccountSettlement } from "@/lib/finance/launcher.functions";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -26,6 +28,9 @@ export type PayTarget = {
 );
 
 export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | null; onClose: () => void; onSaved: () => void }) {
+  const account = useSettlementAccount(!!target);
+  const recordSettlement = useServerFn(recordAccountSettlement);
+  const [requestId,setRequestId] = useState(() => crypto.randomUUID());
   const client = useQueryClient();
   const payBill = useServerFn(payBillFn);
   const reviseBill = useServerFn(reviseBillFn);
@@ -52,6 +57,8 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
       setNote(target.note ?? "");
       setQuits(Boolean(target.is_settled));
       setFiles([]);
+      account.setAccountId("");
+      setRequestId(crypto.randomUUID());
     }
   }, [target]);
 
@@ -77,10 +84,16 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
       toast.error("Informe a data do pagamento.");
       return;
     }
+    if(!account.available && !account.legacy){toast.error("Aguarde a verificação do vínculo da conta ou tente novamente.");return;}
+    if(account.available && !account.accountId){toast.error("Selecione a conta de origem.");return;}
     setSaving(true);
     let paymentSaved = false;
     try {
-      if (target.kind === "bill") {
+      if(account.available){
+        await recordSettlement({data:{requestId,kind:target.kind,id:target.kind==="bill"?target.id:target.contractId,
+          number:target.kind==="installment"?target.number:null,accountId:account.accountId,date,cents,note,
+          reason:isRevision?"Correção de pagamento":"",quits,revision:isRevision}});
+      } else if (target.kind === "bill") {
         const payload = { billId: target.id, paidDate: date, paidCents: cents, note, quits };
         if (isRevision) await reviseBill({ data: payload });
         else await payBill({ data: payload });
@@ -137,6 +150,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
                   <div className="mt-1 text-lg font-extrabold tracking-tight text-foreground">{formatBRL(target.expected_cents)}</div>
                 </div>
               </div>
+              <SettlementAccountField flow="payment" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error}/>
               <div className="space-y-2">
                 <Label htmlFor="pay-date">Data do pagamento</Label>
                 <Input id="pay-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />

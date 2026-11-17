@@ -1,3 +1,5 @@
+import { LaunchPanel } from "@/components/finance/launcher/LaunchPanel";
+import { getLauncherCreditors } from "@/lib/finance/launcher.functions";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -59,6 +61,8 @@ function HomeBroker() {
   const client = useQueryClient();
   const now = new Date();
   const currentExercise = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric" }).format(now));
+  const creditorsFn = useServerFn(getLauncherCreditors);
+  const creditorsQuery = useQuery({queryKey:["launcher-creditors",user?.email],queryFn:()=>creditorsFn(),enabled:!!user});
   const walletFn = useServerFn(getFinances);
   const contractsFn = useServerFn(getContracts);
   const annualDebtFn = useServerFn(getAnnualDebtTotals);
@@ -151,6 +155,8 @@ function HomeBroker() {
           antes da sincronização de faturas. Os demais registros permanecem acessíveis.
         </p>
       )}
+      <LaunchPanel ownerKey={user?.email??""} accounts={wallet.data?.accounts??[]} transactions={wallet.data?.transactions??[]}
+        profiles={profiles.data?.profiles??[]} creditors={creditorsQuery.data??[]} connectionError={wallet.error?.message??wallet.data?.error??creditorsQuery.error?.message??null} />
       <section className="rounded-2xl border bg-card p-4 shadow-soft">
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <CalendarDays className="size-5 text-primary" />
