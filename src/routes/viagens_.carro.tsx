@@ -58,6 +58,7 @@ function CarTripPage() {
       setError("");
       setShowSettings(false);
       setShowKey(false);
+      window.location.reload();
     } catch {
       setError("Não foi possível salvar. Verifique se o navegador permite armazenamento local.");
     }
@@ -71,6 +72,7 @@ function CarTripPage() {
       setDraft("");
       setError("");
       setShowKey(false);
+      window.location.reload();
     } catch {
       setError("Não foi possível remover a chave deste navegador.");
     }
@@ -140,7 +142,7 @@ function CarTripPage() {
               </button>
             </div>
             <p className="text-xs leading-relaxed text-slate-600">
-              A chave é salva somente neste navegador, para esta conta. Como é usada pelo
+              A página será recarregada ao salvar ou remover. A chave fica neste navegador, para esta conta. Como é usada pelo
               Google Maps no navegador, restrinja-a no Google Cloud aos domínios autorizados
               e às APIs necessárias. O cadastro não valida a chave automaticamente.
             </p>
@@ -162,7 +164,9 @@ function CarTripPage() {
         </section>
       )}
 
-      <RoadTripPlatform googleMapsApiKey={personalKey} />
+      {(!storageKey || saved.ownerKey === storageKey) && (
+        <RoadTripPlatform googleMapsApiKey={personalKey} />
+      )}
     </AppShell>
   );
 }
