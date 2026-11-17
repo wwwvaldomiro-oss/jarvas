@@ -1367,7 +1367,7 @@ export function CarRoadTripPlanner({
 
   if (googleMapsApiKey) {
     return (
-      <APIProvider key={googleMapsApiKey} apiKey={googleMapsApiKey} language="pt-BR" region="BR">
+      <APIProvider key={googleMapsApiKey} apiKey={googleMapsApiKey} libraries={['places']} language="pt-BR" region="BR">
         {plannerContent}
       </APIProvider>
     );
