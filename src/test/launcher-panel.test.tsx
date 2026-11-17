@@ -2,12 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 vi.mock("@tanstack/react-start",()=>({useServerFn:(fn:unknown)=>fn}));
-vi.mock("@/lib/finance/launcher.functions",()=>({getLauncherState:vi.fn(async()=>({available:false,launches:[],usedTransactionIds:[],message:"Modo de análise: gravação pendente."})),saveLaunch:vi.fn()}));
+vi.mock("@/lib/finance/launcher.functions",()=>({getLauncherState:vi.fn(async()=>({available:false,launches:[],usedTransactionIds:[],message:"Modo de análise: gravação pendente."})),saveLaunch:vi.fn(),undoLaunch:vi.fn()}));
 vi.mock("@/lib/finance/revenue.functions",()=>({getRevenue:vi.fn(async()=>({sources:[{id:"source",title:"BPC"}],entries:[{id:"entry",source_id:"source",title:"BPC",due_date:"2026-11-17",expected_cents:162000,received_date:null}]}))}));
 vi.mock("@/components/finance/ContractForm",()=>({ContractForm:()=> <div role="dialog">Formulário de contrato parcelado</div>}));
 vi.mock("@/components/finance/RevenueForms",()=>({NewRevenueDialog:()=> <div role="dialog">Nova fonte</div>,ReceiveDialog:({entry}:any)=> <div role="dialog">Recebimento existente {entry.id}</div>}));
 import { LaunchPanel } from "@/components/finance/launcher/LaunchPanel";
-import { saveLaunch } from "@/lib/finance/launcher.functions";
+import { saveLaunch, getLauncherState, undoLaunch } from "@/lib/finance/launcher.functions";
 import type { FinanceAccount } from "@/lib/pluggy.functions";
 const card={id:"card",name:"CAIXA SIM MASTERCARD",type:"CREDIT",number:"1234",closingDate:null,dueDate:null} as FinanceAccount;
 const bank={id:"bank",name:"Conta corrente",type:"BANK",number:"5678"} as FinanceAccount;
@@ -61,6 +61,16 @@ describe("lançador em modo análise",()=>{
    fireEvent.click(screen.getByRole("button",{name:"Registrar recebimento existente"}));
    fireEvent.click(screen.getByRole("button",{name:/17\/11\/2026/}));
    expect(screen.getByText("Recebimento existente entry")).toBeInTheDocument();expect(saveLaunch).not.toHaveBeenCalled();
+ });
+
+ it("libera Salvar com o banco ativo e oferece desfazer no histórico",async()=>{
+   const id="c46061e2-e4e3-48d0-8760-d55157c2d37b";
+   vi.mocked(getLauncherState).mockImplementationOnce(async()=>({available:true,launches:[{id,title:"Operação salva",kind:"expense",date:"2026-11-17",totalCents:10000,status:"settled",canUndo:true}],usedTransactionIds:[],message:null}) as any);
+   vi.mocked(undoLaunch).mockResolvedValueOnce({id,undone:true});
+   mount();fireEvent.click(await screen.findByRole("button",{name:"Desfazer"}));
+   fireEvent.click(screen.getByRole("button",{name:"Confirmar desfazimento"}));
+   await screen.findByRole("button",{name:"Lançar movimentação"});
+   expect(undoLaunch).toHaveBeenCalledWith({data:{launchId:id}});
  });
 
 });

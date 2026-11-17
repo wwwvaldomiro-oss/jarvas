@@ -291,7 +291,7 @@ export const getMonthExpenses = createServerFn({ method: "POST" })
 
     const { data: finalBills, error: finalBillError } = await supabase.from("finance_bills").select("*").gte("due_date", start).lt("due_date", end);
     if (finalBillError) throw new Error(finalBillError.message);
-    const list = (await projectLinkedBillPayments(supabase, finalBills ?? [])).sort((a, b) => a.due_date.localeCompare(b.due_date) || a.creditor.localeCompare(b.creditor));
+    const list = (await projectLinkedBillPayments(supabase, (finalBills ?? []).filter((b:any)=>!b.description?.startsWith("[ÓRION CANCELADO]")))).sort((a, b) => a.due_date.localeCompare(b.due_date) || a.creditor.localeCompare(b.creditor));
 
     // Inclui as parcelas desta competência sem criar cópias de finance_bills.
     // A baixa das parcelas virtuais usa a função canônica pay_installment.
@@ -307,6 +307,7 @@ export const getMonthExpenses = createServerFn({ method: "POST" })
     const represented = new Set(list.filter(b => b.contract_id && b.installment_number != null)
       .map(b => `${b.contract_id}:${b.installment_number}`));
     for (const inst of monthInstallments ?? []) {
+      if(inst.expected_cents<=0)continue;
       const key = `${inst.contract_id}:${inst.number}`;
       if (represented.has(key) || !contractNames.has(inst.contract_id)) continue;
       list.push({

@@ -16,7 +16,7 @@ export const getRevenue = createServerFn({ method: 'POST' }).middleware([require
     if (yearSyncError) throw new Error(yearSyncError.message);
   }
   const [entries, contracts, events, files, sources] = await Promise.all([
-    context.supabase.from('revenue_entries').select('*').order('due_date'),
+    context.supabase.from('revenue_entries').select('*').neq('category','Cancelado').order('due_date'),
     context.supabase.from('revenue_contracts').select('*').order('created_at', { ascending: false }),
     context.supabase.from('revenue_events').select('*').order('created_at', { ascending: false }),
     context.supabase.from('revenue_files').select('*'),
@@ -28,6 +28,7 @@ export const getRevenue = createServerFn({ method: 'POST' }).middleware([require
     const rules = adjustmentRules(source.details);
     if (!rules.length) continue;
     for (const entry of (entries.data ?? []).filter(e => e.source_id === source.id && !e.received_date && !e.contract_id)) {
+      if(entry.adjustment && typeof entry.adjustment==='object' && !Array.isArray(entry.adjustment) && entry.adjustment["finance_launch_override"]===true)continue;
       const expected = expectedForMonth(source, entry.due_date);
       if (entry.expected_cents === expected) continue;
       const { error: adjusted } = await context.supabase.from('revenue_entries')

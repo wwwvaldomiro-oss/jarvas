@@ -43,6 +43,13 @@
       "when": 1794701089211,
       "tag": "0005_conecta_payment_settlement",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794946800000,
+      "tag": "0011_finance_launcher_persistence",
+      "breakpoints": true
     }
   ]
 }

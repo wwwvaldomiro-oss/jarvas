@@ -565,3 +565,13 @@ export async function authorizedMovementAccount(userId:string,accountId:string):
   const {account}=await resolveUserAccount(userId,accountId);
   return {id:account.id,name:`${account.marketingName||account.name}${account.number?` · ${account.number.slice(-4)}`:""}`,type:account.type};
 }
+
+/** Server-verified bank evidence, never a transaction object supplied by the browser. */
+export async function authorizedBankMovementEvidence(userId:string,accountId:string,transactionId:string,from:string){
+ const {account,apiKey}=await resolveUserAccount(userId,accountId);
+ if(account.type!=="BANK")throw new Error("Conciliação de conta bancária indisponível para este cartão.");
+ const entries=await getAllPluggyTransactions(apiKey,accountId,from);
+ const tx=entries.find(t=>t.id===transactionId);
+ if(!tx)throw new Error("Movimentação não encontrada no extrato autorizado.");
+ return {transaction_id:tx.id,account_id:accountId,operation_date:tx.date.slice(0,10),amount_cents:Math.round(Math.abs(tx.amount)*100)*(tx.type==="DEBIT"?-1:1),description:tx.description};
+}

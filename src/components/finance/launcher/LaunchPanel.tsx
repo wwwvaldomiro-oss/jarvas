@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { launchSchema, launchPlan, reconciliationCandidates, suggestedCardDue, type Launch } from "@/lib/finance/launcher";
-import { getLauncherState, saveLaunch } from "@/lib/finance/launcher.functions";
+import { getLauncherState, saveLaunch, undoLaunch } from "@/lib/finance/launcher.functions";
 import { formatBRL, formatDateBR, parseBRL } from "@/lib/finance/money";
 import { todayBR } from "@/lib/finance/revenue";
 import type { FinanceAccount, FinanceTx } from "@/lib/pluggy.functions";
@@ -21,7 +21,8 @@ function SelectField({label,children,value,onChange,required=false,disabled=fals
 }
 export function LaunchPanel({accounts,transactions,profiles,creditors,connectionError,ownerKey}:{ownerKey:string;accounts:FinanceAccount[];transactions:FinanceTx[];profiles:Profile[];creditors:Array<{id:string;creditor:string;year:number}>;connectionError:string|null}) {
   const qc=useQueryClient();
-  const stateFn=useServerFn(getLauncherState),saveFn=useServerFn(saveLaunch);
+  const stateFn=useServerFn(getLauncherState),saveFn=useServerFn(saveLaunch),undoFn=useServerFn(undoLaunch);
+  const [undoTarget,setUndoTarget]=useState<{id:string;title:string}|null>(null),[undoBusy,setUndoBusy]=useState(false);
   const state=useQuery({queryKey:["launcher-state",ownerKey],queryFn:()=>stateFn(),retry:false});
   const [open,setOpen]=useState(false),[preview,setPreview]=useState<Launch|null>(null),[busy,setBusy]=useState(false);
   const [requestId,setRequestId]=useState(()=>crypto.randomUUID());
@@ -71,8 +72,13 @@ export function LaunchPanel({accounts,transactions,profiles,creditors,connection
     try {
       const result=await saveFn({data:preview});
       await qc.invalidateQueries();setPreview(null);setOpen(false);setRequestId(crypto.randomUUID());setTitle("");setValue("");setNet("");setNote("");
-      toast.success(result.duplicate?"Este lançamento já estava salvo. Nenhuma duplicidade foi criada.":"Lançamento salvo.");
+      toast.success(result.duplicate?"Este lançamento já estava salvo. Nenhuma duplicidade foi criada.":"Lançamento salvo.",{action:{label:"Desfazer",onClick:()=>setUndoTarget({id:result.id,title:preview.title})}});
     } catch(e){toast.error((e as Error).message);}finally{setBusy(false);}
+  }
+  async function undo(){
+    if(!undoTarget||undoBusy)return;setUndoBusy(true);
+    try{await undoFn({data:{launchId:undoTarget.id}});await qc.invalidateQueries();setUndoTarget(null);toast.success("Lançamento desfeito. O histórico foi preservado.");}
+    catch(e){toast.error((e as Error).message);}finally{setUndoBusy(false);}
   }
   const plan=preview?launchPlan(preview):[];
   const candidates=preview&&preview.accountId&&preview.medium==="bank"?reconciliationCandidates({accountId:preview.accountId,date:preview.date,
@@ -82,7 +88,7 @@ export function LaunchPanel({accounts,transactions,profiles,creditors,connection
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">Novo lançamento</h2><p className="mt-1 text-sm text-muted-foreground">Organize compras, receitas, contratos e previsões das faturas.</p></div><Button variant="brand" onClick={()=>{setPreview(null);setOpen(true);}}><Plus className="size-4"/>Lançar movimentação</Button></div>
     {state.data?.message && <p role="status" className="mt-3 rounded-lg border border-amber-400/40 bg-amber-50/40 p-3 text-sm dark:bg-amber-950/10">{state.data.message}</p>}
     {state.error && <div role="alert" className="mt-3 text-sm text-destructive">{state.error.message} <Button variant="ghost" onClick={()=>void state.refetch()}><RefreshCw className="size-3"/>Tentar novamente</Button></div>}
-    {(state.data?.launches??[]).length>0 && <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[540px] text-sm"><caption className="sr-only">Últimos lançamentos</caption><thead className="bg-muted text-left"><tr>{["Data","Descrição","Tipo","Valor","Conta","Situação"].map(h=><th className="p-2" key={h}>{h}</th>)}</tr></thead><tbody>{state.data!.launches.map(l=><tr className="border-b" key={l.id}><td className="p-2">{formatDateBR(l.date)}</td><td className="p-2">{l.title}</td><td className="p-2">{kinds[l.kind]}</td><td className="p-2">{l.direction==="debit"?"−":l.direction==="credit"?"+":""}{formatBRL(l.totalCents)}</td><td className="p-2">{l.accountName??"—"}</td><td className="p-2">{{forecast:"Previsto",settled:"Confirmado",reconciled:"Conciliado"}[l.status]}</td></tr>)}</tbody></table></div>}
+    {(state.data?.launches??[]).length>0 && <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[540px] text-sm"><caption className="sr-only">Últimos lançamentos</caption><thead className="bg-muted text-left"><tr>{["Data","Descrição","Tipo","Valor","Conta","Situação","Ação"].map(h=><th className="p-2" key={h}>{h}</th>)}</tr></thead><tbody>{state.data!.launches.map(l=><tr className="border-b" key={l.id}><td className="p-2">{formatDateBR(l.date)}</td><td className="p-2">{l.title}</td><td className="p-2">{kinds[l.kind]}</td><td className="p-2">{l.direction==="debit"?"−":l.direction==="credit"?"+":""}{formatBRL(l.totalCents)}</td><td className="p-2">{l.accountName??"—"}</td><td className="p-2">{{forecast:"Previsto",settled:"Confirmado",reconciled:"Conciliado",undone:"Desfeito"}[l.status]}</td><td className="p-2">{l.canUndo&&<Button size="sm" variant="outline" onClick={()=>setUndoTarget({id:l.id,title:l.title})}>Desfazer</Button>}</td></tr>)}</tbody></table></div>}
     <Dialog open={open} onOpenChange={v=>!busy&&setOpen(v)}><DialogContent className="max-h-[92dvh] max-w-3xl overflow-y-auto"><DialogHeader><DialogTitle>{preview?"Conferir lançamento":"Lançar movimentação"}</DialogTitle><DialogDescription>{preview?"Confira os vínculos e o impacto em cada competência antes de salvar.":"Escolha a operação e indique de onde vem ou para onde vai o dinheiro."}</DialogDescription></DialogHeader>
       {!preview?<form onSubmit={makePreview} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2"><SelectField label="Operação" value={operation} onChange={v=>selectOperation(v as "expense"|"income")}><option value="income">Receita</option><option value="expense">Despesa</option></SelectField>
@@ -124,5 +130,6 @@ export function LaunchPanel({accounts,transactions,profiles,creditors,connection
         <div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={()=>setPreview(null)}>Ajustar</Button><Button variant="brand" disabled={busy||!state.data?.available} onClick={()=>void save()}>{busy?"Salvando…":"Salvar lançamento"}</Button></div>
       </div>}
     </DialogContent></Dialog>
+    <Dialog open={!!undoTarget} onOpenChange={o=>!o&&!undoBusy&&setUndoTarget(null)}><DialogContent><DialogHeader><DialogTitle>Desfazer lançamento</DialogTitle><DialogDescription>{undoTarget?.title}</DialogDescription></DialogHeader><p className="text-sm">A operação e seus efeitos vinculados serão revertidos, preservando o histórico. Faturas fechadas ou pagamentos posteriores exigem conferência antes do estorno.</p><div className="flex justify-end gap-2"><Button variant="outline" disabled={undoBusy} onClick={()=>setUndoTarget(null)}>Cancelar</Button><Button variant="destructive" disabled={undoBusy} onClick={()=>void undo()}>{undoBusy?"Desfazendo…":"Confirmar desfazimento"}</Button></div></DialogContent></Dialog>
   </section>;
 }
