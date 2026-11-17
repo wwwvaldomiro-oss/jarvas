@@ -11,7 +11,7 @@ export const Route = createFileRoute("/viagens_/carro")({
 
 function CarTripPage() {
   const user = useRequireUser();
-  const storageKey = user?.id ? `axion:google-maps-key:${user.id}` : null;
+  const storageKey = user?.email ? `axion:google-maps-key:${user.email.trim().toLowerCase()}` : null;
   const [saved, setSaved] = useState<{ ownerKey: string; value: string }>({
     ownerKey: "",
     value: "",
@@ -20,6 +20,7 @@ function CarTripPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   // Uma chave configurada para outra conta nunca deve ser repassada ao mapa.
   const personalKey = storageKey && saved.ownerKey === storageKey ? saved.value : "";
@@ -58,7 +59,7 @@ function CarTripPage() {
       setError("");
       setShowSettings(false);
       setShowKey(false);
-      window.location.reload();
+      setNotice("Chave salva com sucesso. O mapa será atualizado.");
     } catch {
       setError("Não foi possível salvar. Verifique se o navegador permite armazenamento local.");
     }
@@ -72,7 +73,7 @@ function CarTripPage() {
       setDraft("");
       setError("");
       setShowKey(false);
-      window.location.reload();
+      setNotice("Chave removida. O mapa alternativo está disponível.");
     } catch {
       setError("Não foi possível remover a chave deste navegador.");
     }
@@ -90,6 +91,7 @@ function CarTripPage() {
             setShowSettings((current) => !current);
             setDraft(personalKey);
             setError("");
+            setNotice("");
             setShowKey(false);
           }}
           aria-expanded={showSettings}
@@ -142,11 +144,12 @@ function CarTripPage() {
               </button>
             </div>
             <p className="text-xs leading-relaxed text-slate-600">
-              A página será recarregada ao salvar ou remover. A chave fica neste navegador, para esta conta. Como é usada pelo
+              A chave fica neste navegador, para esta conta. Como é usada pelo
               Google Maps no navegador, restrinja-a no Google Cloud aos domínios autorizados
               e às APIs necessárias. O cadastro não valida a chave automaticamente.
             </p>
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+            {notice && <p role="status" className="text-sm text-emerald-800">{notice}</p>}
             <div className="flex flex-wrap gap-2">
               <button type="submit" className="rounded-lg bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900">
                 Salvar chave
@@ -164,8 +167,9 @@ function CarTripPage() {
         </section>
       )}
 
+      {notice && <p role="status" className="bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{notice}</p>}
       {(!storageKey || saved.ownerKey === storageKey) && (
-        <RoadTripPlatform googleMapsApiKey={personalKey} />
+        <RoadTripPlatform key={personalKey || "mapa-alternativo"} googleMapsApiKey={personalKey} />
       )}
     </AppShell>
   );
