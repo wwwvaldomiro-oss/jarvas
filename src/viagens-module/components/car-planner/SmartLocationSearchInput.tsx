@@ -248,23 +248,15 @@ export function SmartLocationSearchInput({
               onSelectWaypoint(newWaypoint);
               setIsDropdownOpen(false);
             } else {
-              // Fallback
-              const newWaypoint: RouteWaypoint = {
-                id: item.id,
-                label,
-                name: item.name,
-                lat: -23.5505,
-                lng: -46.6333,
-                isCustom: true
-              };
-              setInputValue(item.name);
-              onSelectWaypoint(newWaypoint);
-              setIsDropdownOpen(false);
+              setLocationError('Não foi possível obter as coordenadas deste local. Tente novamente.');
+              setIsDropdownOpen(true);
             }
           }
         );
         return;
       }
+      setLocationError('Google Maps indisponível para localizar este resultado.');
+      return;
     }
 
     // Direct local item with known coordinates
