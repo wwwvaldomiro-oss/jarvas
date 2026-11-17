@@ -4,6 +4,7 @@ interface RoadTripPlatformProps {
   onOpenTicketsPlatform?: () => void;
   initialOriginCity?: string;
   initialDestCity?: string;
+  googleMapsApiKey?: string;
 }
 
 /**
@@ -14,7 +15,8 @@ interface RoadTripPlatformProps {
 export function RoadTripPlatform({
   onOpenTicketsPlatform,
   initialOriginCity = 'São Paulo',
-  initialDestCity = 'Rio de Janeiro'
+  initialDestCity = 'Rio de Janeiro',
+  googleMapsApiKey
 }: RoadTripPlatformProps) {
   return (
     <div className="w-full min-h-screen bg-slate-100 flex flex-col font-sans">
@@ -22,6 +24,7 @@ export function RoadTripPlatform({
         {...(onOpenTicketsPlatform ? { onBackToTickets: onOpenTicketsPlatform } : {})}
         initialOriginCity={initialOriginCity}
         initialDestCity={initialDestCity}
+        {...(googleMapsApiKey ? { googleMapsApiKey } : {})}
       />
     </div>
   );
