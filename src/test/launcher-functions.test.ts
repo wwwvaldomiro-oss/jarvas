@@ -1,3 +1,4 @@
+vi.mock("@/lib/finance/launcher-accounts.server",()=>({verifyAndCacheAccount:vi.fn(),cacheVerifiedAccountDetails:vi.fn()}));
 import { describe, expect, it, vi } from "vitest";
 vi.mock("@tanstack/react-start",()=>({createServerFn:()=>{const b={middleware:()=>b,inputValidator:()=>b,handler:(fn:unknown)=>fn};return b;}}));
 vi.mock("@/integrations/supabase/auth-middleware",()=>({requireSupabaseAuth:{}}));

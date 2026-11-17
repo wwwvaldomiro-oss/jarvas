@@ -9,7 +9,7 @@ import { launchSchema, launchPlan } from "./launcher";
 export const LAUNCHER_SETUP_MESSAGE = "Novas compras e Pix parcelado estão em modo de análise. Pagamentos e recebimentos confirmados com conta vinculada aparecem nos registros abaixo.";
 const capabilities = ["atomic_launch", "settlement_accounts", "card_invoices", "reconciliation"] as const;
 const savedSchema = z.object({id:z.string().min(1),title:z.string(),kind:launchSchema.innerType().shape.kind,
-  date:z.string().date(),totalCents:z.number().int().nonnegative(),status:z.enum(["forecast","settled","reconciled"]),accountName:z.string().optional(),accountId:z.string().optional(),direction:z.enum(["debit","credit"]).optional()});
+  date:z.string().date(),totalCents:z.number().int().nonnegative(),status:z.enum(["forecast","settled","reconciled","undone"]),canUndo:z.boolean().optional(),accountName:z.string().optional(),accountId:z.string().optional(),direction:z.enum(["debit","credit"]).optional()});
 export type SavedLaunch = z.infer<typeof savedSchema>;
 const stateSchema = z.object({version:z.literal(1),capabilities:z.array(z.string()),launches:z.array(savedSchema),
   usedTransactionIds:z.array(z.string())});
@@ -51,12 +51,15 @@ export const getLauncherState = createServerFn({method:"GET"}).middleware([requi
 export const saveLaunch = createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>launchSchema.parse(v)).handler(async({data,context})=>{
     const db=context.supabase as any;
+    const {verifyAndCacheAccount}=await import("./launcher-accounts.server");
     if(data.accountId){
       const type=await assertUserFinanceAccount(db,context.userId,data.accountId);
       if(type !== (data.medium === "card"?"CREDIT":"BANK"))throw new Error("A conta escolhida não corresponde à forma de pagamento.");
+      await verifyAndCacheAccount(context.userId,data.accountId);
     }
     if(data.destinationAccountId && await assertUserFinanceAccount(db,context.userId,data.destinationAccountId)!=="BANK")
       throw new Error("O destino deve ser uma conta bancária autorizada.");
+    if(data.destinationAccountId)await verifyAndCacheAccount(context.userId,data.destinationAccountId);
     if(data.sourceId){
       const {data:source,error}=await db.from("revenue_sources").select("id").eq("id",data.sourceId).eq("user_id",context.userId).maybeSingle();
       if(error||!source)throw new Error("Fonte pagadora não pertence ao usuário.");
@@ -76,8 +79,14 @@ export const saveLaunch = createServerFn({method:"POST"}).middleware([requireSup
 export const reconcileLaunch = createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
   .inputValidator((v:unknown)=>z.object({launchId:z.string().uuid(),transactionId:z.string().min(1).max(200)}).parse(v))
   .handler(async({data,context})=>{
-    // Candidate selection is a proposal. The server-side RPC must verify the provider
-    // transaction against a trusted synced record; browser values are never evidence.
+    const {data:launch,error:lookupError}=await (context.supabase as any).from("finance_launches")
+      .select("account_id,destination_account_id,kind,operation_date").eq("user_id",context.userId).eq("id",data.launchId).single();
+    if(lookupError||!launch)throw new Error("Lançamento não encontrado.");
+    const accountId=launch.kind==="card_credit"?launch.destination_account_id:launch.account_id;
+    if(!accountId)throw new Error("Lançamento sem conta bancária para conciliação.");
+    const {cacheProviderEvidence}=await import("./launcher-accounts.server");
+    const from=new Date(Date.parse(launch.operation_date)-4*86400000).toISOString().slice(0,10);
+    await cacheProviderEvidence(context.userId,accountId,data.transactionId,from);
     const {data:result,error}=await (context.supabase as any).rpc("finance_launch_reconcile",{
       p_version:1,p_launch_id:data.launchId,p_transaction_id:data.transactionId,
     });
@@ -93,6 +102,8 @@ export const recordAccountSettlement = createServerFn({method:"POST"}).middlewar
   .handler(async({data,context})=>{
     const account=await authorizedMovementAccount(context.userId,data.accountId);
     if(account.type!=="BANK")throw new Error("Selecione uma conta bancária. Para usar limite de cartão, use a fonte pagadora Cartão de crédito.");
+    const {cacheVerifiedAccountDetails}=await import("./launcher-accounts.server");
+    await cacheVerifiedAccountDetails(context.userId,account);
     const db=context.supabase as any;
     const {data:result,error}=await db.rpc("finance_record_settlement",{p_version:1,p_settlement:data});
     if(!missingLauncher(error)){
@@ -122,3 +133,11 @@ export const getLauncherCreditors = createServerFn({method:"GET"}).middleware([r
   if(error)throw new Error(error.message);
   return (data??[]) as Array<{id:string;creditor:string;year:number}>;
 });
+
+
+export const undoLaunch = createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator((v:unknown)=>z.object({launchId:z.string().uuid()}).parse(v)).handler(async({data,context})=>{
+  const {data:result,error}=await (context.supabase as any).rpc("finance_launch_undo",{p_version:1,p_launch_id:data.launchId});
+  if(error)throw new Error(error.message);
+  return z.object({id:z.string().uuid(),undone:z.literal(true)}).parse(result);
+ });

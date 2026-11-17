@@ -8,7 +8,7 @@ import type { FinanceTx } from "@/lib/pluggy.functions";
 export function AccountMovementSummary({ownerKey,transactions}:{ownerKey:string;transactions:FinanceTx[]}){
   const fn=useServerFn(getLauncherState);
   const q=useQuery({queryKey:["launcher-state",ownerKey],queryFn:()=>fn(),retry:false});
-  const movements=(q.data?.launches??[]).filter(l=>l.accountId&&l.direction);
+  const movements=(q.data?.launches??[]).filter(l=>l.accountId&&l.direction&&l.status!=="forecast"&&l.status!=="undone");
   if(q.isLoading)return <p className="text-sm text-muted-foreground">Carregando registros das contas…</p>;
   if(q.error)return <p role="alert" className="text-sm text-destructive">{q.error.message}</p>;
   if(!movements.length)return <p className="text-sm text-muted-foreground">Pagamentos e recebimentos confirmados com conta vinculada aparecerão aqui.</p>;

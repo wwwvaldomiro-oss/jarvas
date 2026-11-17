@@ -1,3 +1,4 @@
+vi.mock("@/lib/finance/launcher-accounts.server",()=>({verifyAndCacheAccount:vi.fn(),cacheVerifiedAccountDetails:vi.fn()}));
 import { describe,it,expect,vi } from "vitest";
 import { packMovementNote,unpackMovementNote,visibleMovementNote,movementDelta } from "@/lib/finance/account-movement";
 vi.mock("@tanstack/react-start",()=>({createServerFn:()=>{const b={middleware:()=>b,inputValidator:()=>b,handler:(fn:unknown)=>fn};return b;}}));

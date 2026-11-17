@@ -66,6 +66,8 @@ export const recordClosedCardInvoice = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertUserCreditCard(context.supabase, context.userId, data.accountId);
+    const {verifyAndCacheAccount}=await import("./launcher-accounts.server");
+    await verifyAndCacheAccount(context.userId,data.accountId);
     const { data: outcome, error } = await (context.supabase as any).rpc("apply_closed_card_invoice", {
       p_account_id: data.accountId, p_period: data.period,
       p_closed_at: data.closedAt, p_due_date: data.dueDate,
@@ -97,6 +99,8 @@ export const syncProviderClosedCardInvoices = createServerFn({ method: "POST" })
     for (const profile of profiles ?? []) {
       linkedCards++;
       try {
+        const {verifyAndCacheAccount}=await import("./launcher-accounts.server");
+        await verifyAndCacheAccount(userId,profile.account_id);
         const providerBills = await fetchAuthorizedCardBills(supabase, userId, profile.account_id);
         for (const bill of providerBills) {
           const close = bill.billClosingDate?.slice(0, 10);
