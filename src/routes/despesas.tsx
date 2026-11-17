@@ -2,7 +2,7 @@ import { createFileRoute, Navigate, Outlet, useMatchRoute } from "@tanstack/reac
 
 // Rota estrutural pai: as páginas anuais e parceladas continuam independentes.
 // A antiga interface duplicada "Despesas do Mês" foi desativada;
-// o Registro de pagamento permanece no Painel Financeiro (/home-broker).
+// o Registro de pagamento é aberto em uma janela nas Despesas Anuais.
 export const Route = createFileRoute("/despesas")({
   ssr: false,
   component: DespesasLayout,

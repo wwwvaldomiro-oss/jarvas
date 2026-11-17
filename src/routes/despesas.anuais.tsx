@@ -1,3 +1,6 @@
+import { TableLock } from "@/components/finance/TableLock";
+import { RegistrationDialog } from "@/components/finance/RegistrationDialog";
+import { ExpenseCellPaymentDialog, type ExpenseCell } from "@/components/finance/ExpenseCellPaymentDialog";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -61,6 +64,9 @@ const kindFromSource = (source: SourceKind) => source === "consumption" ? "consu
 function AnuaisPage() {
   const user = useRequireUser();
   const qc = useQueryClient();
+  const [unlocked, setUnlocked] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [payCell, setPayCell] = useState<ExpenseCell | null>(null);
   const [year, setYear] = useState(new Date().getFullYear());
   const currentYear = Number(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo", year: "numeric",
@@ -423,14 +429,16 @@ function AnuaisPage() {
 
   return (
     <AppShell active="anuais" user={user}>
+      {registerOpen && <RegistrationDialog type="despesas" year={year} onClose={() => setRegisterOpen(false)} onSaved={refresh} />}
+      {payCell && <ExpenseCellPaymentDialog cell={payCell} onClose={() => setPayCell(null)} onSaved={() => { void qc.invalidateQueries(); refresh(); setPayCell(null); }} />}
       <div className="annual-print-root p-6 lg:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Controle financeiro</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Controle financeiro<TableLock unlocked={unlocked} onToggle={() => { setEditCell(null); setEditCreditor(null); setUnlocked(v => !v); }} /></div>
             <h1 className="text-3xl font-extrabold">Despesas anuais</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/home-broker"><Button variant="outline">Registro de pagamento <ArrowRight /></Button></Link>
+            <Button variant="outline" onClick={() => setRegisterOpen(true)}>REGISTRAR PAGAMENTO</Button>
             <Link to="/despesas/parceladas"><Button variant="brand">Contratos parcelados <ArrowRight /></Button></Link>
             <Link to="/historico-pagamentos"><Button variant="outline">Histórico de pagamentos</Button></Link>
             <DropdownMenu>
@@ -440,15 +448,15 @@ function AnuaisPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-56">
-                <DropdownMenuItem disabled={syncingCards || !cardProfilesAvailable}
+                <DropdownMenuItem disabled={!unlocked || archived || syncingCards || !cardProfilesAvailable}
                   onSelect={() => { void syncCards(); }}>
                   <RefreshCcw className="mr-2 size-4" />{syncingCards?"Sincronizando…":"Sincronizar faturas"}
                 </DropdownMenuItem>
-                <DropdownMenuItem disabled={updatingContracts}
+                <DropdownMenuItem disabled={!unlocked || archived || updatingContracts}
                   onSelect={() => { void updateAllFutureContracts(); }}>
                   <RefreshCcw className="mr-2 size-4" />{updatingContracts?"Atualizando…":"Atualizar anos futuros"}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => { void toggleArchive(); }}>
+                <DropdownMenuItem disabled={!unlocked} onSelect={() => { void toggleArchive(); }}>
                   {archived?<ArchiveRestore className="mr-2 size-4"/>:<Archive className="mr-2 size-4"/>}
                   {archived?"Reabrir exercício":"Arquivar exercício"}
                 </DropdownMenuItem>
@@ -632,7 +640,7 @@ function AnuaisPage() {
                     <td className="sticky left-0 z-10 bg-card px-2 py-1.5">
                       <div className="flex items-center gap-1">
                         <button type="button" aria-label={`Editar credor ${r.creditor}`} title={r.forecast_only?"Editar cartão e valores previstos":"Classificar e ajustar credor"}
-                          disabled={archived} className="shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-40"
+                          disabled={archived || !unlocked} className="shrink-0 rounded-md p-0.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-40"
                           onClick={() => {void beginEditCreditor(r,cells,total);}}>
                           <Pencil className="size-3.5" />
                         </button>
@@ -650,6 +658,10 @@ function AnuaisPage() {
                       return (
                         <td
                           key={month}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${unlocked ? "Editar previsão" : "Registrar pagamento"}: ${r.creditor}, ${MONTHS_SHORT[i]} ${year}`}
+                          onKeyDown={e => { if(e.key === "Enter" || e.key === " "){e.preventDefault();e.currentTarget.click();} }}
                           title={isGreen ? `Quitado: ${formatBRL(detail.paidCents)} efetivamente pago`
                             : isRed ? `Encerrado com ${formatBRL(detail.remainingCents)} em aberto`
                             : detail.status === "pending" && detail.paidCents > 0
@@ -657,8 +669,9 @@ function AnuaisPage() {
                               : undefined}
                           className={`px-1 py-1 text-right ${isGreen ? "bg-success-soft" : isRed ? "bg-red-500/10" : ""} ${archived ? "" : "cursor-pointer hover:bg-accent"}`}
                           onClick={() => {
-                            if (archived || editing) return;
-                             void beginEditCell(r,month,v);
+                            if (editing) return;
+                            if (unlocked) { if (!archived) void beginEditCell(r,month,v); }
+                            else { void editableRow(r).then(id => setPayCell({id,creditor:r.creditor,year,month,contractId:r.source_contract_id})).catch(e => toast.error(e.message)); }
                           }}
                         >
                           {editing ? (
@@ -706,7 +719,7 @@ function AnuaisPage() {
         </div>
 
         {!archived && (
-          <Button variant="outline" className="mt-4" onClick={() => setAddOpen(true)}><Plus />Cadastrar despesa</Button>
+          <Button variant="outline" disabled={!unlocked || archived} className="mt-4" onClick={() => setAddOpen(true)}><Plus />Cadastrar despesa</Button>
         )}
       </div>
 

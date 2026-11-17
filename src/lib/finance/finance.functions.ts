@@ -1,3 +1,4 @@
+import { linkedInstallment, projectInstallmentPayment } from "./linked-payment";
 import { calculateAnnualIndicators } from "@/lib/finance/annual-indicators";
 import { consolidateAnnualDashboard, summarizeConsumptionForPeriod } from "@/lib/finance/annual-dashboard";
 import { extendFixedConsumptionsForNewContract } from "@/lib/finance/annual-projections.functions";
@@ -9,6 +10,57 @@ import { assertUserCreditCard } from "@/lib/pluggy.functions";
 import { SEED_ANNUAL, SEED_BILLS, SEED_CONTRACTS, SEED_INSTALLMENTS, SEED_YEAR, SEED_YEAR_SOURCE } from "./seed-data";
 
 type Ctx = { supabase: any; userId: string };
+
+// Resolve only technical IDs. Never associate a payment by creditor name or amount.
+async function projectLinkedBillPayments(supabase:any, bills:any[]) {
+  const annualIds=[...new Set(bills.filter(b=>b.source_annual_id).map(b=>b.source_annual_id))];
+  const annuals:any[]=[];
+  for(let i=0;i<annualIds.length;i+=100){
+    const {data,error}=await supabase.from("annual_expenses").select("id,source_contract_id")
+      .in("id",annualIds.slice(i,i+100));
+    if(error) throw new Error("Falha ao consultar vínculo do contrato: "+error.message);
+    annuals.push(...(data??[]));
+  }
+  const byAnnual=new Map(annuals.map(r=>[r.id,r.source_contract_id]));
+  const contractIds=[...new Set(bills.map(b=>b.contract_id??byAnnual.get(b.source_annual_id)).filter(Boolean))];
+  const entries:any[]=[];
+  for(let i=0;i<contractIds.length;i+=50){
+    for(let from=0;;from+=1000){
+      const {data,error}=await selectPaymentRows(supabase,"installment_entries",
+        "contract_id,number,due_date,paid_date,paid_cents,note,is_settled",
+        (q:any)=>q.in("contract_id",contractIds.slice(i,i+50)).order("contract_id").order("number").range(from,from+999));
+      if(error) throw new Error("Falha ao consultar pagamento das parcelas: "+error.message);
+      entries.push(...(data??[]));
+      if((data??[]).length<1000) break;
+    }
+  }
+  return bills.map(b=>projectInstallmentPayment({...b,contract_id:b.contract_id??byAnnual.get(b.source_annual_id)??null},linkedInstallment(b,entries,byAnnual.get(b.source_annual_id))));
+}
+
+async function recordBillPayment(supabase:any, data:{billId:string;paidDate:string;paidCents:number;note?:string | undefined;quits:boolean}, revision:boolean) {
+  const {data:bill,error:readError}=await supabase.from("finance_bills").select("*").eq("id",data.billId).single();
+  if(readError || !bill) throw new Error("Conta não encontrada.");
+  const [linked]=await projectLinkedBillPayments(supabase,[bill]);
+  const contractId=linked?.contract_id??null;
+  const number=linked?.installment_number??null;
+  if(contractId && number==null) throw new Error("O vínculo possui mais de uma parcela nesta competência. Registre pela página do contrato.");
+  // A single existing RPC writes the installment and its audit in one transaction.
+  // All bill views read this canonical record, so no second payment is created.
+  let canonicalRevision=revision;
+  if(contractId){
+    const {data:entry,error}=await supabase.from("installment_entries").select("paid_date")
+      .eq("contract_id",contractId).eq("number",number).single();
+    if(error || !entry) throw new Error("Parcela vinculada não encontrada.");
+    if(!revision && (bill.paid_date || entry.paid_date)) throw new Error("Pagamento existente. Utilize a correção.");
+    canonicalRevision=!!entry.paid_date;
+  }
+  const {error}=await supabase.rpc("record_expense_payment",{
+    p_bill_id:contractId?null:data.billId,p_contract_id:contractId,p_number:contractId?number:null,
+    p_paid_date:data.paidDate,p_paid_cents:data.paidCents,p_note:data.note??"",
+    p_is_settled:data.quits,p_revision:canonicalRevision,
+  });
+  if(error) throw new Error(error.message);
+}
 
 // Compatibilidade temporária com bancos ainda sem a migração de quitação.
 // Não deduz descontos nem altera os pagamentos existentes.
@@ -215,6 +267,7 @@ export const getMonthExpenses = createServerFn({ method: "POST" })
         if(entriesError) throw new Error("Falha ao consultar parcelas: "+entriesError.message);
         const candidates = (entries ?? []).filter((e: any) => !linkedInst.has(`${contractId}:${e.number}`));
         if (candidates.length === 1) inst = candidates[0];
+        else if (candidates.length > 1) continue; // Individual installments are listed below; never create a duplicate monthly aggregate.
       }
 
       // Lançamentos manuais são independentes. Nunca presumir vínculo por credor, valor ou data.
@@ -238,7 +291,7 @@ export const getMonthExpenses = createServerFn({ method: "POST" })
 
     const { data: finalBills, error: finalBillError } = await supabase.from("finance_bills").select("*").gte("due_date", start).lt("due_date", end);
     if (finalBillError) throw new Error(finalBillError.message);
-    const list = ((finalBills ?? []) as any[]).sort((a, b) => a.due_date.localeCompare(b.due_date) || a.creditor.localeCompare(b.creditor));
+    const list = (await projectLinkedBillPayments(supabase, finalBills ?? [])).sort((a, b) => a.due_date.localeCompare(b.due_date) || a.creditor.localeCompare(b.creditor));
 
     // Inclui as parcelas desta competência sem criar cópias de finance_bills.
     // A baixa das parcelas virtuais usa a função canônica pay_installment.
@@ -281,8 +334,7 @@ export const payBillFn = createServerFn({ method: "POST" })
     z.object({ billId: z.string(), paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), paidCents: z.number().int().positive(), note: z.string().max(1000).optional(), quits: z.boolean().default(false) }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase } = context as Ctx;
-    const { error } = await supabase.rpc("record_expense_payment", { p_bill_id: data.billId, p_contract_id: null, p_number: null, p_paid_date: data.paidDate, p_paid_cents: data.paidCents, p_note: data.note ?? "", p_is_settled: data.quits, p_revision: false });
-    if (error) throw new Error(error.message);
+    await recordBillPayment(supabase, data, false);
     return { ok: true };
   });
 
@@ -292,8 +344,7 @@ export const reviseBillFn = createServerFn({ method: "POST" })
     z.object({ billId: z.string(), paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), paidCents: z.number().int().positive(), note: z.string().max(1000).optional(), quits: z.boolean().default(false) }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase } = context as Ctx;
-    const { error } = await supabase.rpc("record_expense_payment", { p_bill_id: data.billId, p_contract_id: null, p_number: null, p_paid_date: data.paidDate, p_paid_cents: data.paidCents, p_note: data.note ?? "", p_is_settled: data.quits, p_revision: true });
-    if (error) throw new Error(error.message);
+    await recordBillPayment(supabase, data, true);
     return { ok: true };
   });
 
@@ -324,7 +375,8 @@ export const deleteBillFn = createServerFn({ method: "POST" })
     const { supabase } = context as Ctx;
     const { data: bill } = await supabase.from("finance_bills").select("*").eq("id", data.billId).single();
     if (!bill) throw new Error("Conta não encontrada");
-    if (bill.paid_date) throw new Error("Conta já paga não pode ser excluída; corrija pelo Histórico.");
+    const [canonical] = await projectLinkedBillPayments(supabase,[bill]);
+    if (canonical?.paid_date) throw new Error("Conta já paga não pode ser excluída; corrija pelo Histórico.");
     const { error } = await supabase.from("finance_bills").delete().eq("id", data.billId);
     if (error) throw new Error(error.message);
     await audit(supabase, "delete_bill", "bill", data.billId, bill, null);
@@ -443,17 +495,18 @@ export const getAnnualIndicatorTotals = createServerFn({ method: "POST" })
       const hasSettlement=await paymentSettlementColumnExists(supabase,"finance_bills");
       payments.push(...await allPages(()=>{
         const cols=hasSettlement
-          ?"source_annual_id,source_period,paid_cents,paid_date,is_settled"
-          :"source_annual_id,source_period,paid_cents,paid_date";
+          ?"contract_id,installment_number,source_annual_id,source_period,paid_cents,paid_date,is_settled"
+          :"contract_id,installment_number,source_annual_id,source_period,paid_cents,paid_date";
         return supabase.from("finance_bills").select(cols)
           .eq("user_id",userId).in("source_annual_id",part)
-          .not("paid_date","is",null).order("source_annual_id").order("source_period");
+          .order("source_annual_id").order("source_period");
       }));
     }
+    const canonicalPayments = await projectLinkedBillPayments(supabase,payments);
     // Os dois painéis usam o MESMO conjunto de registros, sem segunda consulta
     // e sem somar a apuração do ano vigente novamente à apuração geral.
-    const all=calculateAnnualIndicators({rows,cells,payments,currentYear,scope:"all"});
-    const current=calculateAnnualIndicators({rows,cells,payments,currentYear,scope:"current"});
+    const all=calculateAnnualIndicators({rows,cells,payments:canonicalPayments,currentYear,scope:"all"});
+    const current=calculateAnnualIndicators({rows,cells,payments:canonicalPayments,currentYear,scope:"current"});
     const {data:yearRow,error:yearError}=await supabase.from("annual_years")
       .select("archived_at").eq("user_id",userId).eq("year",currentYear).maybeSingle();
     if(yearError) throw new Error("Falha ao consultar status do exercício: "+yearError.message);
@@ -485,13 +538,13 @@ export const getAnnualYear = createServerFn({ method: "POST" })
     // ao credor anual. Espelhos da mesma baixa não geram dois pagamentos.
     const {data:yearBills,error:yearBillsError}=ids.length ? await selectPaymentRows(
       supabase,"finance_bills",
-      "source_annual_id,expected_cents,paid_cents,paid_date,is_settled,source_period",
+      "contract_id,installment_number,source_annual_id,expected_cents,paid_cents,paid_date,is_settled,source_period",
       (q:any)=>q.eq("user_id",userId).in("source_annual_id",ids)
         .gte("source_period",`${data.year}-01`).lte("source_period",`${data.year}-12`)
         .order("source_annual_id").order("source_period")
     ) : {data:[],error:null};
     if(yearBillsError) throw new Error("Falha ao consultar baixas das Despesas Anuais: "+yearBillsError.message);
-    const paidYearBills = (yearBills ?? []).filter((b: any) => b.paid_date);
+    const paidYearBills = (await projectLinkedBillPayments(supabase,yearBills??[])).filter((b: any) => b.paid_date);
 
     type MonthPayment={paidCents:number;isSettled:boolean|null;paidDate:string};
     const monthPayments:Record<string,Record<number,MonthPayment>>={};
@@ -627,7 +680,7 @@ export const updateAnnualCell = createServerFn({ method: "POST" })
     z.object({ expenseId: z.string().uuid(), month: z.number().int().min(1).max(12), expectedCents: z.number().int().min(0).nullable() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase } = context as Ctx;
-    const { data: row } = await supabase.from("annual_expenses").select("year, creditor").eq("id", data.expenseId).single();
+    const { data: row } = await supabase.from("annual_expenses").select("year, creditor, source_contract_id").eq("id", data.expenseId).single();
     if (!row) throw new Error("Credor não encontrado");
     await assertYearOpen(supabase, row.year);
     // Nunca permitir que o ajuste manual de uma previsão altere competência já paga.
@@ -637,6 +690,13 @@ export const updateAnnualCell = createServerFn({ method: "POST" })
       .not("paid_date","is",null).limit(1);
     if(paidError)throw new Error("Não foi possível verificar pagamentos existentes: "+paidError.message);
     if(paid?.length)throw new Error("Competência já paga: corrija o pagamento pelo Histórico de Pagamentos.");
+    if(row.source_contract_id){
+      const {start,end}=periodBounds(period);
+      const {data:entries,error}=await supabase.from("installment_entries").select("number")
+        .eq("contract_id",row.source_contract_id).gte("due_date",start).lt("due_date",end).not("paid_date","is",null).limit(1);
+      if(error) throw new Error(error.message);
+      if(entries?.length) throw new Error("Parcela já paga: corrija o pagamento pelo histórico.");
+    }
     const { data: before } = await supabase.from("annual_expense_months").select("expected_cents").eq("annual_expense_id", data.expenseId).eq("month", data.month).maybeSingle();
     const { error } = await supabase.from("annual_expense_months").upsert(
       { annual_expense_id: data.expenseId, month: data.month, expected_cents: data.expectedCents },
@@ -758,12 +818,12 @@ function contractKpis(entries: any[]) {
   const paidEntries = entries.filter((e) => e.paid_date);
   const paid = paidEntries.reduce((s, e) => s + (e.paid_cents ?? 0), 0);
   const remaining = entries.reduce((s, e) => s + expensePaymentAdjustment(e.expected_cents, e.paid_date ? e.paid_cents : null, e.is_settled === true).openCents, 0);
+  const paidCount = paidEntries.filter(e => e.is_settled === true ||
+    (e.is_settled == null && (e.paid_cents ?? 0) >= e.expected_cents)).length;
   return {
-    total, paid, remaining,
-    paidCount: paidEntries.filter(e => e.is_settled === true ||
-      (e.is_settled == null && (e.paid_cents ?? 0) >= e.expected_cents)).length,
+    total, paid, remaining, paidCount,
     count: entries.length,
-    pct: entries.length ? (paidEntries.length / entries.length) * 100 : 0,
+    pct: entries.length ? (paidCount / entries.length) * 100 : 0,
     firstDue: entries[0]?.due_date ?? null, lastDue: entries[entries.length - 1]?.due_date ?? null,
   };
 }
@@ -896,9 +956,16 @@ export const getHistory = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ year: z.number().int().nullable(), creditor: z.string().nullable() }).parse(data))
   .handler(async ({ data, context }) => {
     const { supabase } = context as Ctx;
-    let billQ = supabase.from("finance_bills").select("*").not("paid_date", "is", null);
+    let billQ = supabase.from("finance_bills").select("*");
     if (data.creditor) billQ = billQ.eq("creditor", data.creditor);
-    const { data: bills } = await billQ;
+    const rawBills:any[]=[];
+    for(let from=0;;from+=1000){
+      const {data:page,error}=await billQ.order("id").range(from,from+999);
+      if(error) throw new Error(error.message);
+      rawBills.push(...(page??[]));
+      if((page??[]).length<1000) break;
+    }
+    const bills = (await projectLinkedBillPayments(supabase,rawBills)).filter(b=>b.paid_date);
 
     const { data: entries } = await supabase.from("installment_entries").select("*").not("paid_date", "is", null);
     const { data: contracts } = await supabase.from("installment_contracts").select("id, name");
@@ -1097,11 +1164,11 @@ export const getAnnualDebtTotals = createServerFn({ method: "GET" })
       }
       for (let from = 0; ; from += 1000) {
         const {data,error}=await selectPaymentRows(
-          supabase,"finance_bills","source_annual_id,source_period,paid_cents,paid_date,is_settled",
+          supabase,"finance_bills","contract_id,installment_number,source_annual_id,source_period,paid_cents,paid_date,is_settled",
           (q:any)=>q.eq("user_id",userId).in("source_annual_id",chunk).range(from,from+999)
         );
         if (error) throw new Error("Falha ao consultar pagamentos anuais: " + error.message);
-        payments.push(...(data ?? []));
+        payments.push(...await projectLinkedBillPayments(supabase,data??[]));
         if ((data ?? []).length < 1000) break;
       }
     }
