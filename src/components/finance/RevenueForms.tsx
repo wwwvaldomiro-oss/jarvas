@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { unpackMovementNote } from "@/lib/finance/account-movement";
 import { SettlementAccountField, useSettlementAccount } from "./launcher/SettlementAccount";
 import { recordAccountSettlement } from "@/lib/finance/launcher.functions";
 import { useState, type ReactNode } from 'react';
@@ -81,28 +83,29 @@ export function NewRevenueDialog({ onClose, onSaved, month, contractOnly=false, 
 }
 
 export function ReceiveDialog({ entry,onClose,onSaved }: {entry:RevenueEntry;onClose:()=>void;onSaved:()=>void}) {
-  const account=useSettlementAccount();const recordSettlement=useServerFn(recordAccountSettlement);
+  const qc=useQueryClient();
+  const account=useSettlementAccount(true,entry.note);const recordSettlement=useServerFn(recordAccountSettlement);
   const [requestId]=useState(()=>crypto.randomUUID());
   const adjusted=entry.adjustment && typeof entry.adjustment==='object' && !Array.isArray(entry.adjustment) ? entry.adjustment['agreed'] : null;
   const [date,setDate]=useState(entry.received_date??todayBR()); const [value,setValue]=useState(((entry.received_cents??(typeof adjusted==='number'?adjusted:entry.expected_cents))/100).toFixed(2).replace('.',','));
-  const [note,setNote]=useState(entry.note); const [reason,setReason]=useState(''); const [files,setFiles]=useState<File[]>([]); const [busy,setBusy]=useState(false);
+  const [note,setNote]=useState(unpackMovementNote(entry.note).note); const [reason,setReason]=useState(''); const [files,setFiles]=useState<File[]>([]); const [busy,setBusy]=useState(false);
   const receive=useServerFn(receiveRevenue); const upload=useServerFn(uploadRevenueFile);
   const cents=parseBRL(value); const diff=cents===null?0:cents-entry.expected_cents;
   async function save(e:React.FormEvent) {e.preventDefault(); if(cents===null) {toast.error('Informe um valor válido.');return;} setBusy(true);
     try { validateFiles(files);
       if(!account.available&&!account.legacy)throw new Error("Aguarde a verificação do vínculo da conta ou tente novamente.");
-      if(account.available){
-        if(!account.accountId)throw new Error('Selecione a conta de destino.');
+      if(account.available&&!account.accountId)throw new Error('Selecione a conta de destino.');
+      if(account.accountId){
         if(cents<=0)throw new Error('Informe um valor positivo para vincular o recebimento à conta.');
         await recordSettlement({data:{requestId,kind:"revenue",id:entry.id,number:null,accountId:account.accountId,date,cents,note,reason,quits:true,revision:!!entry.received_date}});
       }else await receive({data:{id:entry.id,date,cents,note,reason}});
       try {await uploadFiles(upload,files,entry.id,null);} catch(error) {toast.error(`Recebimento registrado; comprovante pendente: ${(error as Error).message}`);}
-      toast.success(entry.received_date?'Correção registrada no histórico.':'Recebimento registrado.');onSaved();onClose();
+      toast.success(entry.received_date?'Correção registrada no histórico.':account.accountId?'Recebimento e entrada na conta registrados.':'Recebimento registrado.');void qc.invalidateQueries();onSaved();onClose();
     }catch(error){toast.error((error as Error).message);}finally{setBusy(false);}
   }
   return <Dialog open onOpenChange={o=>!o&&!busy&&onClose()}><DialogContent className="max-h-[90dvh] overflow-y-auto"><DialogHeader><DialogTitle>{entry.received_date?'Corrigir recebimento':'Registrar Recebimento'}</DialogTitle><DialogDescription>{entry.title}</DialogDescription></DialogHeader><form onSubmit={save} className="space-y-4">
     <div className="flex justify-between text-sm"><span>Valor previsto</span><strong>{formatBRL(entry.expected_cents)}</strong></div>
-    <SettlementAccountField flow="receipt" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error}/>
+    <SettlementAccountField flow="receipt" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error} amountCents={cents}/>
     <Field label="Data de recebimento"><Input required type="date" max={todayBR()} value={date} onChange={e=>setDate(e.target.value)} /></Field><Field label="Valor efetivo (R$)"><Input required inputMode="decimal" value={value} onChange={e=>setValue(e.target.value)} /></Field>
     {cents!==null&&<div className={`text-sm ${diff<0?'text-destructive':diff>0?'text-success':'text-muted-foreground'}`}>{diff===0?'Conforme previsto':`${diff>0?'+':'−'}${formatBRL(Math.abs(diff))} — valor ${diff>0?'superior':'inferior'} ao previsto`}</div>}
     <FileInput onChange={setFiles} /><Field label="Observação"><Textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={2000} /></Field>

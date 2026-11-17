@@ -1,3 +1,4 @@
+import { visibleMovementNote } from "@/lib/finance/account-movement";
 import { TableLock } from "./TableLock";
 import { RegistrationDialog } from "./RegistrationDialog";
 import { useState } from 'react';
@@ -145,7 +146,7 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
     for (const g of groups) {
       lines.push(monthLabel(g), ['Fonte Pagadora', 'Valor previsto', 'Vencimento', 'Recebimento', 'Valor recebido', 'Diferença', 'Observação'].join('\t'));
       for (const e of history.filter(entry => entry.due_date.startsWith(g))) {
-        lines.push([e.title, formatBRL(e.expected_cents), formatDateBR(e.due_date), formatDateBR(e.received_date), formatBRL(e.received_cents), diffLabel(e.expected_cents, e.received_cents), e.note].join('\t'));
+        lines.push([e.title, formatBRL(e.expected_cents), formatDateBR(e.due_date), formatDateBR(e.received_date), formatBRL(e.received_cents), diffLabel(e.expected_cents, e.received_cents), visibleMovementNote(e.note)].join('\t'));
       }
       lines.push('');
     }
@@ -266,8 +267,8 @@ export function RevenueWorkspace({ mode = 'registration', detailContractId, asRe
                   <td className="px-3 py-2 text-center">{formatDateBR(e.received_date)}</td>
                   <td className="px-2 py-2 text-right"><RevenueAccountingMoney cents={e.received_cents??0} received/></td>
                   <td className="px-3 py-2 text-center text-xs">{diffLabel(e.expected_cents,e.received_cents)}</td>
-                  <td className="break-words px-3 py-2 text-xs">{e.note?.trim()
-                    ? e.note : formatDateBR(e.received_date)===formatDateBR(e.due_date)
+                  <td className="break-words px-3 py-2 text-xs">{visibleMovementNote(e.note).trim()
+                    ? visibleMovementNote(e.note) : formatDateBR(e.received_date)===formatDateBR(e.due_date)
                       ? 'Recebido no vencimento'
                       : `Recebido em ${formatDateBR(e.received_date)}`}</td>
                   <td className="px-3 py-2"><div className="flex justify-center">

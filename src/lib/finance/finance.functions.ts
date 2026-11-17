@@ -37,7 +37,7 @@ async function projectLinkedBillPayments(supabase:any, bills:any[]) {
   return bills.map(b=>projectInstallmentPayment({...b,contract_id:b.contract_id??byAnnual.get(b.source_annual_id)??null},linkedInstallment(b,entries,byAnnual.get(b.source_annual_id))));
 }
 
-async function recordBillPayment(supabase:any, data:{billId:string;paidDate:string;paidCents:number;note?:string | undefined;quits:boolean}, revision:boolean) {
+export async function recordBillPayment(supabase:any, data:{billId:string;paidDate:string;paidCents:number;note?:string | undefined;quits:boolean}, revision:boolean) {
   const {data:bill,error:readError}=await supabase.from("finance_bills").select("*").eq("id",data.billId).single();
   if(readError || !bill) throw new Error("Conta não encontrada.");
   const [linked]=await projectLinkedBillPayments(supabase,[bill]);

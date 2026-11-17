@@ -3,6 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 vi.mock("@tanstack/react-start",()=>({useServerFn:(fn:unknown)=>fn}));
 vi.mock("@/lib/finance/launcher.functions",()=>({getLauncherState:vi.fn(async()=>({available:false,launches:[],usedTransactionIds:[],message:"Modo de análise: gravação pendente."})),saveLaunch:vi.fn()}));
+vi.mock("@/lib/finance/revenue.functions",()=>({getRevenue:vi.fn(async()=>({sources:[{id:"source",title:"BPC"}],entries:[{id:"entry",source_id:"source",title:"BPC",due_date:"2026-11-17",expected_cents:162000,received_date:null}]}))}));
+vi.mock("@/components/finance/ContractForm",()=>({ContractForm:()=> <div role="dialog">Formulário de contrato parcelado</div>}));
+vi.mock("@/components/finance/RevenueForms",()=>({NewRevenueDialog:()=> <div role="dialog">Nova fonte</div>,ReceiveDialog:({entry}:any)=> <div role="dialog">Recebimento existente {entry.id}</div>}));
 import { LaunchPanel } from "@/components/finance/launcher/LaunchPanel";
 import { saveLaunch } from "@/lib/finance/launcher.functions";
 import type { FinanceAccount } from "@/lib/pluggy.functions";
@@ -30,10 +33,12 @@ describe("lançador em modo análise",()=>{
  });
  it("mostra crédito recebido e custo separados no financiamento com cartão",async()=>{
   mount();await screen.findByText("Modo de análise: gravação pendente.");fireEvent.click(screen.getByRole("button",{name:"Lançar movimentação"}));
-  fireEvent.change(screen.getByLabelText("Operação"),{target:{value:"card_credit"}});
-  fireEvent.change(screen.getByLabelText("Descrição / credor"),{target:{value:"Crédito C6"}});
+  fireEvent.change(screen.getByLabelText("Operação"),{target:{value:"income"}});
+  fireEvent.change(screen.getByLabelText("Fonte pagadora"),{target:{value:"card"}});
+  expect(screen.getByLabelText("Credor")).toHaveValue("Pix Cartão Parcelado");
+  expect(screen.getByLabelText("Credor")).toHaveAttribute("readonly");
   fireEvent.change(screen.getByLabelText("Total cobrado no cartão (R$)"),{target:{value:"1200,00"}});
-  fireEvent.change(screen.getByLabelText("Valor recebido na conta (R$)"),{target:{value:"1000,00"}});
+  fireEvent.change(screen.getByLabelText("Valor líquido recebido (R$)"),{target:{value:"1000,00"}});
   fireEvent.change(screen.getByLabelText("Cartão de origem"),{target:{value:"card"}});
   fireEvent.change(screen.getByLabelText("Conta de destino"),{target:{value:"bank"}});
   fireEvent.change(screen.getByLabelText("Quantidade total de parcelas"),{target:{value:"12"}});
@@ -42,4 +47,20 @@ describe("lançador em modo análise",()=>{
   fireEvent.click(screen.getByRole("button",{name:"Conferir prévia"}));
   expect(screen.getByText(/Entrada:.*1.000,00.*Custo:.*200,00/)).toBeInTheDocument();expect(screen.getByText("12/12")).toBeInTheDocument();
  });
+ it("oferece só Receita e Despesa e abre o contrato pela fonte pagadora",async()=>{
+   mount();await screen.findByText("Modo de análise: gravação pendente.");fireEvent.click(screen.getByRole("button",{name:"Lançar movimentação"}));
+   expect([...screen.getByLabelText<HTMLSelectElement>("Operação").options].map(o=>o.text)).toEqual(["Receita","Despesa"]);
+   fireEvent.change(screen.getByLabelText("Operação"),{target:{value:"income"}});
+   fireEvent.change(screen.getByLabelText("Fonte pagadora"),{target:{value:"contracts"}});
+   expect(await screen.findByText("Formulário de contrato parcelado")).toBeInTheDocument();
+ });
+ it("fonte existente distingue uma nova renda da baixa de um compromisso",async()=>{
+   mount();await screen.findByText("Modo de análise: gravação pendente.");fireEvent.click(screen.getByRole("button",{name:"Lançar movimentação"}));
+   fireEvent.change(screen.getByLabelText("Operação"),{target:{value:"income"}});
+   await screen.findByRole("option",{name:"BPC"});fireEvent.change(screen.getByLabelText("Fonte pagadora"),{target:{value:"source"}});
+   fireEvent.click(screen.getByRole("button",{name:"Registrar recebimento existente"}));
+   fireEvent.click(screen.getByRole("button",{name:/17\/11\/2026/}));
+   expect(screen.getByText("Recebimento existente entry")).toBeInTheDocument();expect(saveLaunch).not.toHaveBeenCalled();
+ });
+
 });

@@ -1,3 +1,4 @@
+import { visibleMovementNote } from "./account-movement";
 // Moeda sempre em centavos inteiros; nunca calcular dinheiro com ponto flutuante.
 
 export function formatBRL(cents: number | null | undefined): string {
@@ -93,7 +94,7 @@ export function displayNote(bill: {
   paid_note?: string | null;
   is_settled?: boolean | null;
 }): string {
-  const manual = bill.note ?? bill.paid_note;
+  const manual = visibleMovementNote(bill.note ?? bill.paid_note);
   if (manual && manual.trim()) return manual;
   if (!bill.paid_date || bill.paid_cents === null) return "—";
   return autoNote(bill.due_date, bill.paid_date, bill.expected_cents, bill.paid_cents, bill.is_settled ?? true);

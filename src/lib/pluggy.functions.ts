@@ -559,3 +559,9 @@ export async function fetchAuthorizedCardInstallments(userId:string,accountId:st
   const transactions=await getAllPluggyTransactions(apiKey,accountId,from.toISOString().slice(0,10));
   return transactions.filter(t=>t.creditCardMetadata?.totalInstallments||t.totalInstallments);
 }
+
+/** Authenticated description for an account selected in a payment/receipt. */
+export async function authorizedMovementAccount(userId:string,accountId:string):Promise<{id:string;name:string;type:"BANK"|"CREDIT"}>{
+  const {account}=await resolveUserAccount(userId,accountId);
+  return {id:account.id,name:`${account.marketingName||account.name}${account.number?` · ${account.number.slice(-4)}`:""}`,type:account.type};
+}
