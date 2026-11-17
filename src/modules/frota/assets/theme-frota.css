@@ -1,0 +1,41 @@
+/* theme-frota.css — Design Tokens do Módulo de Gestão de Frota
+   Paleta corporativa clássica: Azul-noite, Petróleo, Ouro, Marfim e Gelo */
+
+:root {
+  --fleet-navy: #0C1928;      /* Azul-noite: Sidebar, títulos, texto primário */
+  --fleet-petrol: #173D4A;    /* Petróleo: Ações primárias, gráficos, foco */
+  --fleet-gold: #B99555;      /* Ouro: Destaques, CTA rápido, alertas preventivos */
+  --fleet-ivory: #E7E1D5;     /* Marfim: Bordas 1px, divisores, superfícies neutras */
+  --fleet-ice: #F7F8FA;       /* Gelo: Fundo principal da aplicação */
+  --fleet-surface: #FFFFFF;   /* Branco: Cards, tabelas e modais */
+
+  /* Semânticas dessaturadas alinhadas ao sistema clássico */
+  --fleet-success: #2E6F5E;
+  --fleet-warning: #A66E1E;
+  --fleet-danger: #9E3B3B;
+  --fleet-text-muted: #5C6B7A;
+  --fleet-radius: 10px;
+}
+
+.fleet-module-root {
+  font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
+  background-color: var(--fleet-ice);
+  color: var(--fleet-navy);
+}
+
+.fleet-module-root h1,
+.fleet-module-root h2,
+.fleet-module-root h3,
+.fleet-module-root .font-display {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  text-wrap: balance;
+}
+
+.fleet-module-root .font-mono-tabular {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.fleet-module-root .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
