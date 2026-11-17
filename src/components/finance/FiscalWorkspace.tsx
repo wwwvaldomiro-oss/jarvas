@@ -1,3 +1,4 @@
+import { confirmAction } from '@/lib/popup';
 import { useEffect,useMemo,useRef,useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -125,7 +126,7 @@ export function FiscalWorkspace({view="notas"}:{view?:View}){
   }catch(e){toast.error(e instanceof Error?e.message:"Erro ao salvar nota")}finally{setBusy(false)}
  };
  const beginEdit=(d:FiscalDoc)=>{setEditing(d);setFile(null);setDraft({issuer:d.issuer,issued_on:d.issued_on,document_number:d.document_number??"",access_key:d.access_key??"",total:(d.total_cents/100).toFixed(2).replace(".",","),category:d.category});setReviewed(false);setOpenForm(true)};
- const remove=async(d:FiscalDoc)=>{if(!window.confirm("Excluir esta nota e seus arquivos? Esta ação não pode ser desfeita."))return;try{await deleteFiscal(d);setSelected(null);await qc.invalidateQueries({queryKey:["axion-fiscal"]});toast.success("Nota excluída")}catch(e){toast.error(e instanceof Error?e.message:"Falha ao excluir")}};
+ const remove=async(d:FiscalDoc)=>{if(!(await confirmAction("Excluir esta nota e seus arquivos? Esta ação não pode ser desfeita.")))return;try{await deleteFiscal(d);setSelected(null);await qc.invalidateQueries({queryKey:["axion-fiscal"]});toast.success("Nota excluída")}catch(e){toast.error(e instanceof Error?e.message:"Falha ao excluir")}};
  const open=(d:FiscalDoc)=>{setOriginal(false);setSelected(d)};
  const buttons=<div className="space-y-3">
    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

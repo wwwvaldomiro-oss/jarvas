@@ -1,3 +1,4 @@
+import { confirmAction } from '@/lib/popup';
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -76,7 +77,7 @@ function ParceladasPage() {
   async function toggleArchive() {
     if (!current) return;
     const archived = !!current.archived_at;
-    if (!window.confirm(`Deseja ${archived ? "reabrir" : "arquivar"} o contrato "${current.name}"? Pagamentos e histórico são preservados.`)) return;
+    if (!(await confirmAction(`Deseja ${archived ? "reabrir" : "arquivar"} o contrato "${current.name}"? Pagamentos e histórico são preservados.`))) return;
     try {
       await archiveFn({ data: { contractId: current.id, archived: !archived } });
       toast.success(archived ? "Contrato reaberto." : "Contrato arquivado (somente leitura).");

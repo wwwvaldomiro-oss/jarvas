@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -132,11 +133,11 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0C1928]/60 backdrop-blur-[1px]">
+    <ViewportOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0C1928]/60 backdrop-blur-[1px]">
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-lg bg-white border border-[#E7E1D5] rounded-[10px] shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="w-full max-w-lg bg-white border border-[#E7E1D5] rounded-[10px] shadow-xl overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)]"
       >
         <div className="px-6 py-4 border-b border-[#E7E1D5] flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-[#0C1928]">
@@ -152,7 +153,7 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 min-h-0 overflow-y-auto">
           {errorMsg && (
             <div className="p-3 rounded-lg bg-[#9E3B3B]/10 border border-[#9E3B3B]/30 text-xs font-medium text-[#9E3B3B]">
               {errorMsg}
@@ -365,6 +366,6 @@ export const VehicleFormModal: React.FC<VehicleFormModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 };

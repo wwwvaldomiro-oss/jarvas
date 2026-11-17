@@ -1,3 +1,4 @@
+import { confirmAction } from '@/lib/popup';
 import { TableLock } from "@/components/finance/TableLock";
 import { RegistrationDialog } from "@/components/finance/RegistrationDialog";
 import { ExpenseCellPaymentDialog, type ExpenseCell } from "@/components/finance/ExpenseCellPaymentDialog";
@@ -265,7 +266,7 @@ function AnuaisPage() {
 
   async function toggleArchive() {
     const action = archived ? "reabrir" : "arquivar";
-    if (!window.confirm(`Deseja ${action} o exercício ${year}?`)) return;
+    if (!(await confirmAction(`Deseja ${action} o exercício ${year}?`))) return;
     try {
       await archiveFn({ data: { year, archived: !archived } });
       toast.success(archived ? "Exercício reaberto." : "Exercício arquivado (somente leitura).");

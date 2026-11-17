@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Toaster } from 'sonner';
 import { ExportIntegrationDrawer } from './components/ExportIntegrationDrawer';
 import { FleetLayout } from './components/FleetLayout';
 import { QuickEntryModal, type QuickEntryKind } from './components/QuickEntryModal';
@@ -31,7 +30,6 @@ export const FleetModule: React.FC<FleetModuleProps> = ({
 
   return (
     <FleetProvider adapter={adapter} currentUser={currentUser}>
-      <Toaster position="top-right" richColors closeButton />
       <FleetLayout
         activeTab={activeTab}
         onChangeTab={setActiveTab}

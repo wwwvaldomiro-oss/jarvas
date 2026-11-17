@@ -1,3 +1,4 @@
+import { confirmAction, promptValue } from '@/lib/popup';
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -331,7 +332,7 @@ function NuvemPage() {
       return;
     }
 
-    const folderName = window.prompt("Nome da pasta:");
+    const folderName = (await promptValue("Nome da pasta:"));
     if (!folderName || !folderName.trim()) return;
 
     try {
@@ -401,7 +402,7 @@ function NuvemPage() {
   }
 
   async function resetVault() {
-    const confirmed = window.confirm("Deseja limpar o cofre local e reiniciar a Nuvem?");
+    const confirmed = (await confirmAction("Deseja limpar o cofre local e reiniciar a Nuvem?"));
     if (!confirmed) return;
 
     stopIdleLock();

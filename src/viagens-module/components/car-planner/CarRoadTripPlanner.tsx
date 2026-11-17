@@ -1,3 +1,5 @@
+import { promptValue } from '@/lib/popup';
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   MapPin, 
@@ -265,8 +267,8 @@ export function CarRoadTripPlanner({
     showNotification(`Rota configurada: ${preset.name} (${preset.highway})`);
   };
 
-  const saveCurrentRoute = () => {
-    const name = window.prompt('Nome da rota para salvar:', originWaypoint.name + ' → ' + destWaypoint.name);
+  const saveCurrentRoute = async () => {
+    const name = (await promptValue('Nome da rota para salvar:', originWaypoint.name + ' → ' + destWaypoint.name));
     if (!name?.trim()) return;
     const next = [{id: String(Date.now()),name:name.trim(),origin:originWaypoint,destination:destWaypoint,stops:intermediateStops,vehicle:selectedVehicle,fuel:selectedFuel,price:customFuelPrice,consumption:customKmPerL}, ...savedRoutes];
     try { localStorage.setItem('orion.savedCarRoutes.v1',JSON.stringify(next)); setSavedRoutes(next); showNotification('Rota salva neste navegador'); }
@@ -1319,7 +1321,7 @@ export function CarRoadTripPlanner({
         </main>
       </div>
 
-      {savedRoutesOpen && <div role="dialog" aria-modal="true" aria-label="Rotas salvas" className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0C1928]/60 p-4" onClick={() => setSavedRoutesOpen(false)}>
+      {savedRoutesOpen && <ViewportOverlay role="dialog" aria-modal="true" aria-label="Rotas salvas" className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0C1928]/60 p-4" onClick={() => setSavedRoutesOpen(false)}>
         <div className="w-full max-w-lg rounded-2xl bg-[#F7F8FA] p-5 shadow-2xl" onClick={e=>e.stopPropagation()}>
           <div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-2 text-lg font-bold text-[#0C1928]"><FolderOpen className="size-5"/> Rotas salvas</h2><button type="button" onClick={()=>setSavedRoutesOpen(false)} aria-label="Fechar" className="rounded-lg px-3 py-1 text-xl">×</button></div>
           <div className="max-h-[55vh] space-y-2 overflow-y-auto">
@@ -1333,7 +1335,7 @@ export function CarRoadTripPlanner({
           </div>
           <p className="mt-4 text-xs text-slate-500">Rotas armazenadas somente neste navegador. Enviar para GPS abre o aplicativo de navegação compatível.</p>
         </div>
-      </div>}
+      </ViewportOverlay>}
       {/* Driver Share Modal */}
       <ShareDriverModal
         route={calculatedRoute}

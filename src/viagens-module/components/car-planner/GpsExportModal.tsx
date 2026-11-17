@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import { useState } from 'react';
 import { 
   X, 
@@ -54,7 +55,7 @@ export function GpsExportModal({ route, isOpen, onClose }: GpsExportModalProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <ViewportOverlay className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
       <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 animate-in fade-in zoom-in-95">
         
         {/* Header */}
@@ -196,6 +197,6 @@ export function GpsExportModal({ route, isOpen, onClose }: GpsExportModalProps) 
           </button>
         </div>
       </div>
-    </div>
+    </ViewportOverlay>
   );
 }

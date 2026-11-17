@@ -1,3 +1,4 @@
+import { ViewportOverlay } from '@/components/ui/viewport-overlay';
 import React, { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -417,7 +418,7 @@ export const VehiclesDriversPage: React.FC = () => {
 
       {/* Drawer de Detalhes do Veículo */}
       {inspectingVehicle && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/50">
+        <ViewportOverlay className="fixed inset-0 z-50 flex justify-end bg-[#0C1928]/50">
           <div className="w-full max-w-md bg-white h-full border-l border-[#E7E1D5] shadow-2xl flex flex-col">
             <div className="px-6 py-4 border-b border-[#E7E1D5] flex items-center justify-between">
               <div>
@@ -520,7 +521,7 @@ export const VehiclesDriversPage: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ViewportOverlay>
       )}
 
       <VehicleFormModal

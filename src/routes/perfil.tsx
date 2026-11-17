@@ -1,3 +1,4 @@
+import { showAlert } from '@/lib/popup';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useState, type ChangeEvent } from 'react';
 import {
@@ -238,10 +239,10 @@ function PerfilPage() {
       <div className="rounded-3xl border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center gap-2"><Database className="h-4 w-4 text-muted-foreground" /><h3 className="font-semibold">Backup e restauração</h3></div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Button type="button" variant="outline" className="justify-start" onClick={() => window.alert('Backup solicitado.')}> 
+          <Button type="button" variant="outline" className="justify-start" onClick={() => void showAlert('Backup solicitado.')}>
             <span className="inline-flex items-center gap-2"><Database className="h-4 w-4" /> Fazer backup</span>
           </Button>
-          <Button type="button" variant="outline" className="justify-start" onClick={() => window.alert('Restauração do backup iniciada.')}> 
+          <Button type="button" variant="outline" className="justify-start" onClick={() => void showAlert('Restauração do backup iniciada.')}>
             <span className="inline-flex items-center gap-2"><Eye className="h-4 w-4" /> Restaurar backup</span>
           </Button>
         </div>
@@ -272,10 +273,10 @@ function PerfilPage() {
       <div className="rounded-3xl border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-muted-foreground" /><h3 className="font-semibold">Segurança e acesso</h3></div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Button type="button" variant="outline" className="justify-start" onClick={() => window.alert('Redefinição de senha iniciada.') }>
+          <Button type="button" variant="outline" className="justify-start" onClick={() => void showAlert('Redefinição de senha iniciada.') }>
             <span className="inline-flex items-center gap-2"><KeyRound className="h-4 w-4" /> Redefinir senha</span>
           </Button>
-          <Button type="button" variant="outline" className="justify-start" onClick={() => window.alert('Conexão com Google será configurada.') }>
+          <Button type="button" variant="outline" className="justify-start" onClick={() => void showAlert('Conexão com Google será configurada.') }>
             <span className="inline-flex items-center gap-2"><Globe className="h-4 w-4" /> Cadastrar/alterar conta Google</span>
           </Button>
         </div>
