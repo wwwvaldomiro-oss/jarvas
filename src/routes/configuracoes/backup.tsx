@@ -8,8 +8,8 @@ import { toast } from "sonner";
 
 /** Explicit allowlist: exclude credentials, provider tokens and other secrets. */
 const TABLES = [
-  "agenda_records", "agenda_checks", "annual_years", "annual_expenses",
-  "annual_expense_months", "finance_bills", "finance_account_profiles",
+  "agenda_records", "annual_years", "annual_expenses",
+  "finance_bills", "finance_account_profiles",
   "finance_card_closed_invoices", "finance_card_debt_links",
   "finance_card_month_snapshots", "installment_contracts", "installment_entries",
   "revenue_contracts", "revenue_entries", "revenue_events", "revenue_sources",
@@ -36,7 +36,7 @@ function BackupPage() {
         // Pagination is essential: Supabase commonly caps individual queries at 1,000 rows.
         const records: PortableCollection["records"] = [];
         for (let from = 0; ; from += 500) {
-          const { data, error } = await supabase.from(table).select("*").range(from, from + 499);
+          const { data, error } = await supabase.from(table).select("*").eq("user_id", auth.user.id).range(from, from + 499);
           if (error) throw new Error(`Falha ao ler ${table}: ${error.message}`);
           const rows = (data ?? []) as Array<Record<string, unknown>>;
           for (const row of rows) {
