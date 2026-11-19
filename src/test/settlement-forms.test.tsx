@@ -1,6 +1,7 @@
 import {afterEach,describe,it,expect,vi} from "vitest";
 import {cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
+vi.mock("@/lib/finance/transaction-trace.functions",()=>({ getTransactionTrace:vi.fn() }));
 vi.mock("@tanstack/react-start",()=>({useServerFn:(fn:unknown)=>fn}));
 vi.mock("@/components/finance/launcher/SettlementAccount",async()=>{
   const {useState}=await import("react");

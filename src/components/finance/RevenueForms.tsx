@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { formatBRL, parseBRL } from '@/lib/finance/money';
 import { REVENUE_CATEGORIES, lateCharges, todayBR, type RevenueEntry, type RevenueContract, type RevenueSource } from '@/lib/finance/revenue';
-import { createRevenue, editRevenue, createRevenueContract, receiveRevenue, adjustRevenue, uploadRevenueFile } from '@/lib/finance/revenue.functions';
+import { createRevenue, editRevenue, createRevenueContract, adjustRevenue, uploadRevenueFile } from '@/lib/finance/revenue.functions';
 import { fileToBase64, validateAttachmentFile } from '@/lib/finance/files';
 import { ContractForm } from './ContractForm';
 
@@ -89,16 +89,13 @@ export function ReceiveDialog({ entry,onClose,onSaved }: {entry:RevenueEntry;onC
   const adjusted=entry.adjustment && typeof entry.adjustment==='object' && !Array.isArray(entry.adjustment) ? entry.adjustment['agreed'] : null;
   const [date,setDate]=useState(entry.received_date??todayBR()); const [value,setValue]=useState(((entry.received_cents??(typeof adjusted==='number'?adjusted:entry.expected_cents))/100).toFixed(2).replace('.',','));
   const [note,setNote]=useState(unpackMovementNote(entry.note).note); const [reason,setReason]=useState(''); const [files,setFiles]=useState<File[]>([]); const [busy,setBusy]=useState(false);
-  const receive=useServerFn(receiveRevenue); const upload=useServerFn(uploadRevenueFile);
+  const upload=useServerFn(uploadRevenueFile);
   const cents=parseBRL(value); const diff=cents===null?0:cents-entry.expected_cents;
   async function save(e:React.FormEvent) {e.preventDefault(); if(cents===null) {toast.error('Informe um valor válido.');return;} setBusy(true);
     try { validateFiles(files);
-      if(!account.available&&!account.legacy)throw new Error("Aguarde a verificação do vínculo da conta ou tente novamente.");
-      if(account.available&&!account.accountId)throw new Error('Selecione a conta de destino.');
-      if(account.accountId){
-        if(cents<=0)throw new Error('Informe um valor positivo para vincular o recebimento à conta.');
-        await recordSettlement({data:{requestId,kind:"revenue",id:entry.id,number:null,accountId:account.accountId,date,cents,note,reason,quits:true,revision:!!entry.received_date}});
-      }else await receive({data:{id:entry.id,date,cents,note,reason}});
+      if(!account.available||!account.accountId)throw new Error('Selecione a conta de destino.');
+      if(cents<=0)throw new Error('Informe um valor positivo para vincular o recebimento à conta.');
+      await recordSettlement({data:{requestId,kind:"revenue",id:entry.id,number:null,accountId:account.accountId,date,cents,note,reason,quits:true,revision:!!entry.received_date}});
       try {await uploadFiles(upload,files,entry.id,null);} catch(error) {toast.error(`Recebimento registrado; comprovante pendente: ${(error as Error).message}`);}
       toast.success(entry.received_date?'Correção registrada no histórico.':account.accountId?'Recebimento e entrada na conta registrados.':'Recebimento registrado.');void qc.invalidateQueries();onSaved();onClose();
     }catch(error){toast.error((error as Error).message);}finally{setBusy(false);}
@@ -110,7 +107,7 @@ export function ReceiveDialog({ entry,onClose,onSaved }: {entry:RevenueEntry;onC
     {cents!==null&&<div className={`text-sm ${diff<0?'text-destructive':diff>0?'text-success':'text-muted-foreground'}`}>{diff===0?'Conforme previsto':`${diff>0?'+':'−'}${formatBRL(Math.abs(diff))} — valor ${diff>0?'superior':'inferior'} ao previsto`}</div>}
     <FileInput onChange={setFiles} /><Field label="Observação"><Textarea value={note} onChange={e=>setNote(e.target.value)} maxLength={2000} /></Field>
     {entry.received_date&&<Field label="Motivo da correção"><Textarea required value={reason} onChange={e=>setReason(e.target.value)} maxLength={1000} /></Field>}
-    <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button type="submit" variant="brand" disabled={busy}>{busy?'Salvando…':'Confirmar'}</Button></div></form></DialogContent></Dialog>;
+    <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button><Button type="submit" variant="brand" disabled={busy || !account.available || !account.accountId}>{busy?'Salvando…':'Confirmar'}</Button></div></form></DialogContent></Dialog>;
 }
 
 export function AdjustmentDialog({entry,contract,onClose,onSaved,onDocument}:{entry:RevenueEntry;contract:RevenueContract;onClose:()=>void;onSaved:()=>void;onDocument:(text:string)=>void}) {

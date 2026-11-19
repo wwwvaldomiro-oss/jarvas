@@ -50,6 +50,13 @@
       "when": 1794946800000,
       "tag": "0011_finance_launcher_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795068000000,
+      "tag": "0012_finance_transaction_trace",
+      "breakpoints": true
     }
   ]
 }

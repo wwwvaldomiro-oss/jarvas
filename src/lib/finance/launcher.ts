@@ -7,6 +7,7 @@ const id = z.string().min(1).max(200);
 export const launchSchema = z.object({
   requestId: z.string().uuid(),
   kind: z.enum(["expense", "income", "card_credit", "contract", "invoice_baseline"]),
+  merchant: z.string().trim().max(200).optional(),
   title: z.string().trim().min(1).max(200),
   date, totalCents: cents,
   medium: z.enum(["bank", "card", "creditor"]),

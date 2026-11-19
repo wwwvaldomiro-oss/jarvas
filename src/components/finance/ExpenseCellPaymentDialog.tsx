@@ -1,3 +1,4 @@
+import { AnnualTraceDisclosure } from "./launcher/TransactionTrace";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,13 +18,14 @@ export function ExpenseCellPaymentDialog({ cell, onClose, onSaved }: {cell: Expe
     (cell.contractId && b.contract_id === cell.contractId));
   const target = (b: typeof bills[number]): PayTarget => ({
     ...(b.kind === "installment" ? {kind: "installment", contractId: b.contract_id, number: b.installment_number} : {kind: "bill", id: b.id}),
-    creditor: b.creditor, due_date: b.due_date, expected_cents: b.expected_cents,
+    annualCell: {annualId:cell.id,period}, creditor: b.creditor, due_date: b.due_date, expected_cents: b.expected_cents,
     paid_date: b.paid_date, paid_cents: b.paid_cents, note: b.paid_note, is_settled: b.is_settled,
   });
   const active = selected ?? (bills.length === 1 ? target(bills[0]!) : null);
   if (active) return <PayDialog target={active} onClose={onClose} onSaved={onSaved} />;
   return <Dialog open onOpenChange={o => !o && onClose()}><DialogContent aria-describedby={undefined}>
     <DialogHeader><DialogTitle>{cell.creditor} · {period}</DialogTitle></DialogHeader>
+    <AnnualTraceDisclosure annualId={cell.id} period={period}/>
     {q.isLoading && <p>Carregando compromisso…</p>}
     {q.error && <p role="alert">{q.error.message}</p>}
     {!q.isLoading && !q.error && !bills.length && <p>Nenhum compromisso lançado nesta célula. Libere o cadeado para cadastrar o valor previsto antes de pagar.</p>}

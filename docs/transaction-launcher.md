@@ -1,5 +1,17 @@
 # Lançador financeiro — contrato de ativação
 
+## Da compra à baixa
+
+| Operação | Compromisso | Movimento da conta |
+|---|---|---|
+| Compra no cartão | Cada parcela compõe a fatura da competência em Despesas Anuais | A baixa da fatura identifica a conta que pagou o conjunto de compras |
+| Compra ou conta avulsa a prazo | Valor devido ao credor em Despesas Anuais | O pagamento identifica conta, data e valor efetivo |
+| Compra à vista já paga | A mesma obrigação nasce com a baixa | Uma saída na conta informada |
+| Receita prevista | Valor a receber da fonte ou contrato | A confirmação identifica a conta de destino |
+| Pix Cartão Parcelado | O valor bruto é distribuído nas faturas do cartão | O valor líquido entra na conta indicada na confirmação |
+
+No Painel Financeiro, selecionar a descrição de um lançamento abre seu histórico. Na Carteira, selecionar uma entrada ou saída mostra a mesma origem. Em Despesas Anuais, selecionar a célula com o cadeado fechado e abrir **Origem do compromisso e pagamentos** mostra a composição do mês. A consulta usa identificadores do lançamento, da linha anual, da competência e da parcela. Uma fatura antiga pode ter total conhecido e composição desconhecida. A conta de pagamento também pode estar ausente nos registros antigos.
+
 ## Estado deste lote
 
 A persistência e o desfazimento estão implementados na migração aditiva `0011_finance_launcher_persistence.sql`, versionada pelo Git mediante autorização do proprietário, sem solicitação à IA do Lovable. A aplicação do SQL utiliza acesso administrativo direto ao banco. Não há transferência bancária: os registros representam o controle do aplicativo.
