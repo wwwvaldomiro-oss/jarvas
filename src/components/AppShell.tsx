@@ -151,6 +151,7 @@ function SidebarAccount({user,onNavigate}: {user:AppUser | null;onNavigate?: (()
                 <Link to="/nuvem" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Nuvem</Link>
                 <Link to="/perfil" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Perfil</Link>
                 <Link to="/configuracoes/open-finance" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Configurações · Open Finance</Link>
+                <Link to="/configuracoes/backup" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Dados e Backup</Link>
                 <Link to="/auditoria" onClick={onNavigate} className="rounded-md p-2 text-sm hover:bg-accent">Auditoria</Link>
               </div>
             </details>
