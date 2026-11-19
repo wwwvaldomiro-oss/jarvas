@@ -89,6 +89,9 @@ export function RegistrationWorkspace({ type, initialYear, onSaved }: {type: "de
   const [receiving, setReceiving] = useState<RevenueEntry | null>(null);
   const registerType = type;
   const [oneOffOpen, setOneOffOpen] = useState(false);
+  const [oneOffRequest,setOneOffRequest]=useState(()=>crypto.randomUUID());
+  const [oneOffDetail,setOneOffDetail]=useState("");
+  const [oneOffKind,setOneOffKind]=useState<"debt"|"consumption">("debt");
   const [oneOffName, setOneOffName] = useState("");
   const [oneOffAmount, setOneOffAmount] = useState("");
   const [oneOffDue, setOneOffDue] = useState(new Date().toISOString().slice(0, 10));
@@ -118,7 +121,7 @@ export function RegistrationWorkspace({ type, initialYear, onSaved }: {type: "de
     try {
       const cents = Math.round(amount * 100);
       if (registerType === "despesas") {
-        await createManualBillFn({ data: { creditor: oneOffName.trim(), description: "Conta avulsa", dueDate: oneOffDue, expectedCents: cents } });
+        await createManualBillFn({ data: { requestId:oneOffRequest,creditor: oneOffName.trim(),description:oneOffDetail.trim(),expenseKind:oneOffKind, dueDate: oneOffDue, expectedCents: cents } });
       } else {
         await createRevenueFn({ data: {
           title: oneOffName.trim(), category: "Outros Rendimentos", expected_cents: cents,
@@ -126,6 +129,7 @@ export function RegistrationWorkspace({ type, initialYear, onSaved }: {type: "de
         } });
       }
       setYear(Number(oneOffDue.slice(0,4))); setMonth(Number(oneOffDue.slice(5,7)));
+      setOneOffRequest(crypto.randomUUID());setOneOffDetail("");setOneOffKind("debt");
       setOneOffOpen(false); setOneOffName(""); setOneOffAmount("");
       refresh();
       toast.success("Conta avulsa criada. Confirme o pagamento ou recebimento na lista; depois ficará no histórico.");
@@ -244,6 +248,7 @@ export function RegistrationWorkspace({ type, initialYear, onSaved }: {type: "de
                   <td className="p-3"><div className="flex items-center gap-2">
                     <Button size="sm" variant={b.paid_date ? "outline" : "brand"} onClick={() => setTarget({
                       ...(b.kind === "installment" ? { kind: "installment" as const, contractId: b.contract_id, number: b.installment_number } : { kind: "bill" as const, id: b.id }), creditor: b.creditor, due_date: b.due_date,
+                      ...(b.source_annual_id ? {annualCell:{annualId:b.source_annual_id,period}} : {}),
                       expected_cents: b.expected_cents, paid_date: b.paid_date, paid_cents: b.paid_cents, note: b.paid_note, is_settled: b.is_settled,
                     })}>{b.paid_date ? "Corrigir" : "Confirmar pagamento"}</Button>
                     <AttachmentButton entityType={b.kind === "installment" ? "installment" : "bill"} entityId={b.kind === "installment" ? `${b.contract_id}:${b.installment_number}` : b.id} />
@@ -291,6 +296,8 @@ export function RegistrationWorkspace({ type, initialYear, onSaved }: {type: "de
       <form aria-label={registerType === "despesas" ? "Nova despesa avulsa" : "Nova receita avulsa"} className="space-y-4" onSubmit={e => { e.preventDefault(); void createOneOff(); }}>
         <div><p className="text-xs text-muted-foreground">Sem recorrência e sem inclusão na tabela anual. O histórico será gerado após a confirmação da operação.</p></div>
         <label className="block text-sm font-semibold">Nome / {registerType === "despesas" ? "credor" : "fonte pagadora"}<input required maxLength={100} className="mt-1 w-full rounded-md border bg-background p-2" value={oneOffName} onChange={e => setOneOffName(e.target.value)} /></label>
+        {registerType==="despesas"&&<><label className="block text-sm font-semibold">Descrição do gasto<input className="mt-1 w-full rounded-md border bg-background p-2" maxLength={200} value={oneOffDetail} onChange={e=>setOneOffDetail(e.target.value)}/></label>
+        <label className="block text-sm font-semibold">Classificação<select className="mt-1 w-full rounded-md border bg-background p-2" value={oneOffKind} onChange={e=>setOneOffKind(e.target.value==="consumption"?"consumption":"debt")}><option value="debt">Dívida</option><option value="consumption">Consumo</option></select></label></>}
         <label className="block text-sm font-semibold">Valor (R$)<input required type="text" inputMode="decimal" className="mt-1 w-full rounded-md border bg-background p-2" placeholder="0,00" value={oneOffAmount} onChange={e => setOneOffAmount(e.target.value)} /></label>
         <label className="block text-sm font-semibold">Data de vencimento<input required type="date" className="mt-1 w-full rounded-md border bg-background p-2" value={oneOffDue} onChange={e => setOneOffDue(e.target.value)} /></label>
         <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={oneOffSaving} onClick={() => setOneOffOpen(false)}>Cancelar</Button><Button type="submit" disabled={oneOffSaving}>{oneOffSaving ? "Salvando…" : "Cadastrar"}</Button></div>

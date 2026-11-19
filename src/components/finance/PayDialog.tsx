@@ -1,3 +1,4 @@
+import { AnnualTraceDisclosure } from "./launcher/TransactionTrace";
 import { unpackMovementNote } from "@/lib/finance/account-movement";
 import { SettlementAccountField, useSettlementAccount } from "./launcher/SettlementAccount";
 import { recordAccountSettlement } from "@/lib/finance/launcher.functions";
@@ -13,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { expensePaymentAdjustment, formatAdjustmentPercent, formatBRL, formatDateBR, parseBRL } from "@/lib/finance/money";
 import { fileToBase64, validateAttachmentFile } from "@/lib/finance/files";
-import { payBillFn, payInstallmentFn, reviseBillFn, reviseInstallmentFn, uploadAttachment } from "@/lib/finance/finance.functions";
+import { uploadAttachment } from "@/lib/finance/finance.functions";
 
 export type PayTarget = {
   creditor: string;
@@ -23,6 +24,7 @@ export type PayTarget = {
   paid_cents: number | null;
   note: string | null;
   is_settled?: boolean | null;
+  annualCell?: {annualId:string;period:string};
 } & (
   | { kind: "bill"; id: string }
   | { kind: "installment"; contractId: string; number: number }
@@ -33,10 +35,6 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
   const recordSettlement = useServerFn(recordAccountSettlement);
   const [requestId,setRequestId] = useState(() => crypto.randomUUID());
   const client = useQueryClient();
-  const payBill = useServerFn(payBillFn);
-  const reviseBill = useServerFn(reviseBillFn);
-  const payInst = useServerFn(payInstallmentFn);
-  const reviseInst = useServerFn(reviseInstallmentFn);
   const upload = useServerFn(uploadAttachment);
 
   const [date, setDate] = useState("");
@@ -85,24 +83,13 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
       toast.error("Informe a data do pagamento.");
       return;
     }
-    if(!account.available && !account.legacy){toast.error("Aguarde a verificação do vínculo da conta ou tente novamente.");return;}
-    if(account.available && !account.accountId){toast.error("Selecione a conta de origem.");return;}
+    if(!account.available || !account.accountId){toast.error("Selecione a conta de origem.");return;}
     setSaving(true);
     let paymentSaved = false;
     try {
-      if(account.accountId){
-        await recordSettlement({data:{requestId,kind:target.kind,id:target.kind==="bill"?target.id:target.contractId,
+      await recordSettlement({data:{requestId,kind:target.kind,id:target.kind==="bill"?target.id:target.contractId,
           number:target.kind==="installment"?target.number:null,accountId:account.accountId,date,cents,note,
           reason:isRevision?"Correção de pagamento":"",quits,revision:isRevision}});
-      } else if (target.kind === "bill") {
-        const payload = { billId: target.id, paidDate: date, paidCents: cents, note, quits };
-        if (isRevision) await reviseBill({ data: payload });
-        else await payBill({ data: payload });
-      } else {
-        const payload = { contractId: target.contractId, number: target.number, paidDate: date, paidCents: cents, note, quits };
-        if (isRevision) await reviseInst({ data: payload });
-        else await payInst({ data: payload });
-      }
       paymentSaved = true;
       const entityType = target.kind === "bill" ? "bill" : "installment";
       const entityId = target.kind === "bill" ? target.id : `${target.contractId}:${target.number}`;
@@ -151,6 +138,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
                   <div className="mt-1 text-lg font-extrabold tracking-tight text-foreground">{formatBRL(target.expected_cents)}</div>
                 </div>
               </div>
+              {target.annualCell && <AnnualTraceDisclosure {...target.annualCell}/>}
               <SettlementAccountField flow="payment" value={account.accountId} onChange={account.setAccountId} available={account.available} accounts={account.accounts} error={account.error} amountCents={centsPreview}/>
               <div className="space-y-2">
                 <Label htmlFor="pay-date">Data do pagamento</Label>
@@ -229,7 +217,7 @@ export function PayDialog({ target, onClose, onSaved }: { target: PayTarget | nu
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>Cancelar</Button>
-              <Button variant="brand" onClick={confirm} disabled={saving}>
+              <Button variant="brand" onClick={confirm} disabled={saving || !account.available || !account.accountId}>
                 {saving ? "Salvando…" : isRevision ? "Salvar correção" : "Confirmar pagamento"}
               </Button>
             </DialogFooter>

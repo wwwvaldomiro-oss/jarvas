@@ -353,20 +353,16 @@ export const addManualBill = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
     z.object({
+      requestId:z.string().uuid().optional(),
       creditor: z.string().trim().min(1).max(100), description: z.string().trim().max(200).optional(),
       dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), expectedCents: z.number().int().positive(),
       expenseKind: z.enum(["debt", "consumption"]).default("debt"),
     }).parse(data))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as Ctx;
-    const id = `manual-${crypto.randomUUID()}`;
-    const { error } = await supabase.from("finance_bills").insert({
-      id, user_id: userId, creditor: data.creditor, description: data.description || "Conta avulsa",
-      due_date: data.dueDate, expected_cents: data.expectedCents, expense_kind: data.expenseKind,
-    });
-    if (error) throw new Error(error.message);
-    await audit(supabase, "add_bill", "bill", id, null, data);
-    return { id };
+    const { supabase } = context as Ctx;
+    const {data:ids,error}=await supabase.rpc("finance_create_open_bills",{p_rows:[{...data,requestId:data.requestId??crypto.randomUUID()}]});
+    if(error) throw new Error(error.message);
+    return {id:z.array(z.string()).min(1).parse(ids)[0]!};
   });
 
 export const deleteBillFn = createServerFn({ method: "POST" })
@@ -378,6 +374,8 @@ export const deleteBillFn = createServerFn({ method: "POST" })
     if (!bill) throw new Error("Conta não encontrada");
     const [canonical] = await projectLinkedBillPayments(supabase,[bill]);
     if (canonical?.paid_date) throw new Error("Conta já paga não pode ser excluída; corrija pelo Histórico.");
+    if (bill.source_annual_id && /^(manual-|csv-|launch:)/.test(bill.id))
+      throw new Error("Use Desfazer no lançamento de origem para atualizar também Despesas Anuais.");
     const { error } = await supabase.from("finance_bills").delete().eq("id", data.billId);
     if (error) throw new Error(error.message);
     await audit(supabase, "delete_bill", "bill", data.billId, bill, null);
@@ -427,7 +425,8 @@ export const importBillsCsv = createServerFn({ method: "POST" })
     const hasHeader = /credor/i.test(rows[0]?.[0] ?? "");
     const body = hasHeader ? rows.slice(1) : rows;
 
-    const { data: existing } = await supabase.from("finance_bills").select("creditor, description, due_date, expected_cents").gte("due_date", start).lt("due_date", end);
+    const { data: existing,error:lookupError } = await supabase.from("finance_bills").select("creditor, description, due_date, expected_cents").gte("due_date", start).lt("due_date", end);
+    if (lookupError) throw new Error(lookupError.message);
     const seen = new Set((existing ?? []).map((b: any) => `${b.creditor.toLowerCase()}|${(b.description ?? "").toLowerCase()}|${b.due_date}|${b.expected_cents}`));
 
     const valid: any[] = [];
@@ -448,14 +447,10 @@ export const importBillsCsv = createServerFn({ method: "POST" })
     }
 
     if (data.confirm && valid.length > 0) {
-      const { error } = await supabase.from("finance_bills").insert(
-        valid.map((v) => ({
-          id: `csv-${crypto.randomUUID()}`, user_id: userId, creditor: v.creditor,
-          description: v.description || "Importado via CSV", due_date: v.dueDate, expected_cents: v.cents,
-        })),
-      );
-      if (error) throw new Error(error.message);
-      await audit(supabase, "import_csv", "period", data.period, null, { imported: valid.length, skipped: skipped.length });
+      const {error}=await supabase.rpc("finance_create_open_bills",{
+        p_csv:true,p_rows:valid.map(v=>({creditor:v.creditor,description:v.description,dueDate:v.dueDate,expectedCents:v.cents}))
+      });
+      if(error) throw new Error(error.message);
     }
     return { preview: valid, skipped, errors, imported: data.confirm ? valid.length : 0 };
   });

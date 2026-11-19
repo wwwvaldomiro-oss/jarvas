@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { TransactionTrace } from "./TransactionTrace";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getLauncherState } from "@/lib/finance/launcher.functions";
@@ -6,6 +8,7 @@ import { formatBRL,formatDateBR } from "@/lib/finance/money";
 import type { FinanceTx } from "@/lib/pluggy.functions";
 
 export function AccountMovementSummary({ownerKey,transactions}:{ownerKey:string;transactions:FinanceTx[]}){
+  const [expanded,setExpanded]=useState<string|null>(null);
   const fn=useServerFn(getLauncherState);
   const q=useQuery({queryKey:["launcher-state",ownerKey],queryFn:()=>fn(),retry:false});
   const movements=(q.data?.launches??[]).filter(l=>l.accountId&&l.direction&&l.status!=="forecast"&&l.status!=="undone");
@@ -18,7 +21,7 @@ export function AccountMovementSummary({ownerKey,transactions}:{ownerKey:string;
     <p className="text-xs text-muted-foreground">Registros do sistema, separados do extrato bancário. Possíveis correspondências precisam de conferência; o saldo informado pelo banco é preservado.</p>
     <div className="max-h-96 divide-y overflow-auto">{movements.map(m=>{
       const candidates=reconciliationCandidates({accountId:m.accountId!,date:m.date,cents:m.totalCents,direction:m.direction!},transactions.map(t=>({id:t.id,accountId:t.accountId,date:t.date,amountCents:Math.round(t.amount*100),description:t.description})),new Set(q.data?.usedTransactionIds??[]));
-      return <div key={m.id} className="flex justify-between gap-3 py-3 text-sm"><div><p className="font-semibold">{m.title}</p><p className="text-xs text-muted-foreground">{m.accountName} · {formatDateBR(m.date)}</p><p className="mt-1 text-xs text-muted-foreground">{candidates.length?`${candidates.length} possível(is) correspondência(s) no Pluggy — conferir` : "Aguardando correspondência no Pluggy"}</p></div><strong className={m.direction==="credit"?"text-blue-600":"text-red-600"}>{m.direction==="credit"?"+":"−"}{formatBRL(m.totalCents)}</strong></div>;
+      return <div key={m.id} className="flex justify-between gap-3 py-3 text-sm"><div>{q.data?.available?<button type="button" className="text-left font-semibold underline" aria-expanded={expanded===m.id} onClick={()=>setExpanded(expanded===m.id?null:m.id)}>{m.title}</button>:<p className="font-semibold">{m.title}</p>}<p className="text-xs text-muted-foreground">{m.accountName} · {formatDateBR(m.date)}</p><p className="mt-1 text-xs text-muted-foreground">{m.status==="reconciled"?"Conciliado com o extrato":candidates.length?`${candidates.length} possível(is) correspondência(s) no Pluggy — conferir` : "Aguardando correspondência no Pluggy"}</p>{expanded===m.id&&<TransactionTrace selector={{launchId:m.id}}/>}</div><strong className={m.direction==="credit"?"text-blue-600":"text-red-600"}>{m.direction==="credit"?"+":"−"}{formatBRL(m.totalCents)}</strong></div>;
     })}</div>
   </div>;
 }
